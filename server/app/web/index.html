@@ -54,7 +54,6 @@
   .hwbtn:active { background: #666; }
   .led { width: 10px; height: 10px; border-radius: 50%; background: #333; margin: 0 auto; }
   .screen-scale { width: 320px; height: 240px; overflow: hidden; }
-  @media (min-width: 900px) { .screen-scale.x2 { width: 480px; height: 360px; } .screen-scale.x2 .screen { transform: scale(1.5); } }
   .screen { width: 320px; height: 240px; transform-origin: 0 0; background: var(--dfi-bg); color: var(--dfi-ink);
             font-family: "DejaVu Sans", "Inter", system-ui, sans-serif; position: relative; overflow: hidden; }
   .screen.light { background: #f7f7f2; color: #121212; --dfi-muted: #667; }
@@ -96,7 +95,7 @@
     <div class="preview-wrap">
       <div class="bezel">
         <div class="btncol"><button class="hwbtn" data-btn="A" title="Profil zurück">A</button><button class="hwbtn" data-btn="B" title="Profil vor">B</button></div>
-        <div class="screen-scale x2"><div class="screen" id="screen"></div></div>
+        <div class="screen-scale"><div class="screen" id="screen"></div></div>
         <div class="btncol"><button class="hwbtn" data-btn="X" title="Nachtmodus">X</button><div class="led" id="led"></div><button class="hwbtn" data-btn="Y" title="Neu laden">Y</button></div>
       </div>
     </div>
