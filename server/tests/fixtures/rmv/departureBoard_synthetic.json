@@ -1,0 +1,28 @@
+{
+  "serverVersion": "2.39",
+  "dialectVersion": "2.39",
+  "Departure": [
+    {
+      "Product": [{"name": "U4", "line": "U4", "catOut": "U-Bahn", "catOutS": "U", "catOutL": "U-Bahn", "catIn": "U", "catCode": "4"}],
+      "Messages": {"Message": [{"id": "him1", "act": true, "head": "Aufzug Merianplatz außer Betrieb", "text": "Der Aufzug ist bis auf Weiteres außer Betrieb."}]},
+      "JourneyDetailRef": {"ref": "1|1|0|80|23112026"},
+      "name": "U4", "type": "ST", "stop": "Frankfurt (Main) Merianplatz", "stopid": "A=1@O=Frankfurt (Main) Merianplatz@L=3000512@",
+      "stopExtId": "3000512", "time": "18:09:00", "date": "2026-11-23", "rtTime": "18:10:00", "rtDate": "2026-11-23",
+      "direction": "Frankfurt (Main) Bockenheimer Warte", "track": "2"
+    },
+    {
+      "Product": {"name": "U4", "line": "U4", "catOut": "U-Bahn", "catIn": "U"},
+      "JourneyDetailRef": {"ref": "1|2|0|80|23112026"},
+      "name": "U4", "type": "ST", "stop": "Frankfurt (Main) Merianplatz", "stopid": "A=1@O=Frankfurt (Main) Merianplatz@L=3000512@",
+      "time": "18:11", "date": "2026-11-23", "direction": "Frankfurt (Main) Enkheim", "cancelled": "true"
+    },
+    {
+      "Product": [{"name": "Bus 30", "line": "30", "catOutS": "Bus", "catOutL": "Bus"}],
+      "JourneyDetailRef": {"ref": "1|3|0|80|23112026"},
+      "name": "Bus 30", "type": "ST", "stop": "Frankfurt (Main) Merianplatz", "stopid": "x",
+      "time": "23:58:00", "date": "2026-11-23", "rtTime": "00:03:00", "rtDate": "2026-11-24",
+      "direction": "Bad Vilbel Bahnhof"
+    }
+  ],
+  "Message": [{"id": "him2", "head": "Bauarbeiten S-Bahn-Tunnel"}]
+}

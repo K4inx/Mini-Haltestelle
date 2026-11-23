@@ -1,0 +1,152 @@
+[
+ {
+  "type": "ADDRESS",
+  "tokens": [
+   [
+    0.0,
+    6.0
+   ],
+   [
+    7.0,
+    7.0
+   ],
+   [
+    15.0,
+    4.0
+   ],
+   [
+    20.0,
+    9.0
+   ]
+  ],
+  "name": "Berger Straße 100",
+  "id": "",
+  "lat": 50.1220284,
+  "lon": 8.6996707,
+  "street": "Berger Straße",
+  "houseNumber": "100",
+  "country": "DE",
+  "zip": "60316",
+  "tz": "Europe/Berlin",
+  "areas": [
+   {
+    "name": "Deutschland",
+    "adminLevel": 2.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Hessen",
+    "adminLevel": 4.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Regierungsbezirk Darmstadt",
+    "adminLevel": 5.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Frankfurt am Main",
+    "adminLevel": 6.0,
+    "matched": true,
+    "unique": true,
+    "default": true
+   },
+   {
+    "name": "Innenstadt 3",
+    "adminLevel": 9.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Nordend Ost",
+    "adminLevel": 10.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   }
+  ],
+  "score": -30.401199340820312
+ },
+ {
+  "type": "ADDRESS",
+  "tokens": [
+   [
+    0.0,
+    6.0
+   ],
+   [
+    7.0,
+    7.0
+   ],
+   [
+    15.0,
+    4.0
+   ],
+   [
+    20.0,
+    9.0
+   ]
+  ],
+  "name": "Berger Straße 100",
+  "id": "",
+  "lat": 50.1219817,
+  "lon": 8.6995707,
+  "street": "Berger Straße",
+  "houseNumber": "100",
+  "country": "DE",
+  "zip": "60316",
+  "tz": "Europe/Berlin",
+  "areas": [
+   {
+    "name": "Deutschland",
+    "adminLevel": 2.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Hessen",
+    "adminLevel": 4.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Regierungsbezirk Darmstadt",
+    "adminLevel": 5.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Frankfurt am Main",
+    "adminLevel": 6.0,
+    "matched": true,
+    "unique": true,
+    "default": true
+   },
+   {
+    "name": "Innenstadt 3",
+    "adminLevel": 9.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Nordend Ost",
+    "adminLevel": 10.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   }
+  ],
+  "score": -30.401199340820312
+ }
+]

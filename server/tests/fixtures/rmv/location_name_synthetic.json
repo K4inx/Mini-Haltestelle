@@ -1,0 +1,4 @@
+{"stopLocationOrCoordLocation": [
+  {"StopLocation": {"id": "A=1@O=Frankfurt (Main) Merianplatz@X=8695260@Y=50120030@U=80@L=3000512@", "extId": "3000512", "name": "Frankfurt (Main) Merianplatz", "lon": 8.69526, "lat": 50.12003}},
+  {"CoordLocation": {"id": "A=2@O=Merianplatz@", "name": "Merianplatz", "type": "ADR"}}
+]}

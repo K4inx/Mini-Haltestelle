@@ -1,0 +1,217 @@
+[
+ {
+  "type": "STOP",
+  "tokens": [
+   [
+    0.0,
+    11.0
+   ],
+   [
+    12.0,
+    9.0
+   ]
+  ],
+  "name": "Frankfurt (Main) Merianplatz",
+  "id": "de-DELFI_de:06412:512",
+  "lat": 50.12003000000001,
+  "lon": 8.69526,
+  "level": -2.0,
+  "country": "DE",
+  "zip": "60316",
+  "tz": "Europe/Berlin",
+  "areas": [
+   {
+    "name": "Deutschland",
+    "adminLevel": 2.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Hessen",
+    "adminLevel": 4.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Regierungsbezirk Darmstadt",
+    "adminLevel": 5.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Frankfurt am Main",
+    "adminLevel": 6.0,
+    "matched": false,
+    "unique": true,
+    "default": true
+   },
+   {
+    "name": "Innenstadt 3",
+    "adminLevel": 9.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Nordend Ost",
+    "adminLevel": 10.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   }
+  ],
+  "score": -29.418716430664062,
+  "modes": [
+   "SUBWAY"
+  ],
+  "importance": 0.002699495991691947
+ },
+ {
+  "type": "STOP",
+  "tokens": [
+   [
+    0.0,
+    11.0
+   ],
+   [
+    12.0,
+    9.0
+   ]
+  ],
+  "name": "Frankfurt (M) Hbf",
+  "id": "at-Railway-Current-Reference-Data-2026_de:06412:10:16:16",
+  "lat": 50.106293,
+  "lon": 8.661960999999998,
+  "level": 0.0,
+  "country": "DE",
+  "zip": "60329",
+  "tz": "Europe/Berlin",
+  "areas": [
+   {
+    "name": "Deutschland",
+    "adminLevel": 2.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Hessen",
+    "adminLevel": 4.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Regierungsbezirk Darmstadt",
+    "adminLevel": 5.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Frankfurt am Main",
+    "adminLevel": 6.0,
+    "matched": false,
+    "unique": true,
+    "default": true
+   },
+   {
+    "name": "Innenstadt 1",
+    "adminLevel": 9.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Gallus",
+    "adminLevel": 10.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   }
+  ],
+  "score": -16.044841766357422,
+  "modes": [
+   "HIGHSPEED_RAIL",
+   "LONG_DISTANCE",
+   "COACH",
+   "NIGHT_RAIL",
+   "RIDE_SHARING",
+   "REGIONAL_RAIL",
+   "SUBURBAN",
+   "SUBWAY",
+   "TRAM",
+   "BUS"
+  ],
+  "importance": 0.032898757606744766
+ },
+ {
+  "type": "STOP",
+  "tokens": [
+   [
+    0.0,
+    11.0
+   ],
+   [
+    12.0,
+    9.0
+   ]
+  ],
+  "name": "Frankfurt (Oder)",
+  "id": "de-DELFI_de:12053:900360000",
+  "lat": 52.336708,
+  "lon": 14.547146999999999,
+  "level": 1.0,
+  "country": "DE",
+  "zip": "15230",
+  "tz": "Europe/Berlin",
+  "areas": [
+   {
+    "name": "Deutschland",
+    "adminLevel": 2.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Brandenburg",
+    "adminLevel": 4.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Frankfurt (Oder)",
+    "adminLevel": 6.0,
+    "matched": false,
+    "unique": true,
+    "default": true
+   },
+   {
+    "name": "Gubener Vorstadt, Innenstadt, Frankfurt (Oder)",
+    "adminLevel": 9.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   },
+   {
+    "name": "Innenstadt, Frankfurt (Oder)",
+    "adminLevel": 9.0,
+    "matched": false,
+    "unique": false,
+    "default": false
+   }
+  ],
+  "score": -15.721665382385254,
+  "modes": [
+   "LONG_DISTANCE",
+   "REGIONAL_RAIL",
+   "TRAM",
+   "BUS"
+  ],
+  "importance": 0.0073542105965316296
+ }
+]
