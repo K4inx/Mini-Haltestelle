@@ -1,0 +1,13 @@
+services:
+  abfahrtsanzeige:
+    build: .
+    image: abfahrtsanzeige-server:latest
+    container_name: abfahrtsanzeige
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/app/config   # config.yaml (per Web-UI beschreibbar) + Backup
+      - ./data:/app/data       # Gerätezustand
+    mem_limit: 256m

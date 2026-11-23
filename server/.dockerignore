@@ -1,0 +1,7 @@
+tests
+.env
+data
+config/config.yaml*
+__pycache__
+.pytest_cache
+.ruff_cache
