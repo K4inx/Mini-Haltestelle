@@ -1,31 +1,35 @@
-"""FastAPI-App: Endpunkte, Lebenszyklus, Verdrahtung."""
+"""FastAPI-App: Endpunkte, Lebenszyklus, Verdrahtung.
+
+Das Web-UI ist nur fürs Heimnetz gedacht und hat keine Anmeldung: Wer die Seite erreicht,
+kann Vorlagen anlegen und löschen. Deshalb den Port nie öffentlich freigeben.
+"""
 
 from __future__ import annotations
 
 import logging
 import os
-import secrets as pysecrets
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, PlainTextResponse
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 from . import __version__, board, setup_assistant
-from .config import AppConfig, Secrets, load_config, parse_config_text, resolve_provider
+from .config import AppConfig, NightConfig, Place, ScheduleEntry, Secrets, load_config, save_config
 from .devices import DeviceStore
-from .models import Board, StationMatch
+from .models import Board, BoardRow, DisplayMode, DisplayState, StationMatch
 from .notify import LeaveNotifier
 from .poller import Poller
 from .providers import DepartureProvider, ProviderError, TransitousProvider, make_provider
 
 log = logging.getLogger("abfahrtsanzeige")
 WEB = Path(__file__).parent / "web"
+UI_ACTIVE_FOR = timedelta(minutes=2)
 
 
 @dataclass
@@ -34,32 +38,60 @@ class Runtime:
     cfg: AppConfig
     secrets: Secrets
     provider: DepartureProvider
-    transitous: TransitousProvider  # für Assistent + Stationssuche, unabhängig vom Haupt-Provider
+    transitous: TransitousProvider  # für Assistent + Adresssuche, unabhängig vom Haupt-Provider
     poller: Poller
     devices: DeviceStore
     notifier: LeaveNotifier
+    ui_seen: datetime | None = field(default=None)
 
     def now(self) -> datetime:
         return datetime.now(ZoneInfo(self.cfg.timezone))
 
-    def station_ids(self, profile: str) -> dict[str, list[str]]:
+    def station_ids(self, profile: str | None) -> dict[str, list[str]]:
         """Stationsname → IDs beim aktiven Provider."""
+        if profile is None or profile not in self.cfg.profiles:
+            return {}
         return {s.name: s.ids_for(self.provider.name) for s in self.cfg.profiles[profile].stops}
 
     def needed(self) -> set[str]:
-        """Stationen, die der Poller gerade abfragen soll: aktive Profile aktiver Geräte."""
+        """Stationen, die der Poller abfragen soll: aktive Vorlagen aktiver Geräte,
+        und alle Vorlagen, solange das Web-UI offen ist (für die Übersicht)."""
         now = self.now()
-        ids: set[str] = set()
+        profiles: set[str | None] = set()
         for dev in self.devices.active_devices(now):
             night = self.devices.night(self.cfg, dev, now)
             if night and self.cfg.night and self.cfg.night.mode == "off":
                 continue  # Display aus → keine Abfragen
-            for sid_list in self.station_ids(self.devices.profile(self.cfg, dev, now)).values():
-                ids.update(sid_list)
-        return ids
+            profiles.add(self.devices.profile(self.cfg, dev, now))
+        if self.ui_seen and now - self.ui_seen < UI_ACTIVE_FOR:
+            profiles.update(self.cfg.profiles)
+        return {i for p in profiles for ids in self.station_ids(p).values() for i in ids}
+
+    def save(self, cfg: AppConfig) -> None:
+        save_config(self.config_path, cfg)
+        self.cfg = cfg
+
+    def build(self, profile: str, now: datetime, *, night: bool = False):
+        ids_by_stop = self.station_ids(profile)
+        all_ids = {i for ids in ids_by_stop.values() for i in ids}
+        deps = {
+            name: [d for sid in ids for d in self.poller.departures(sid)] for name, ids in ids_by_stop.items()
+        }
+        return board.build_board(
+            self.cfg,
+            profile,
+            deps,
+            now,
+            night=night,
+            stale_since=self.poller.stale_since(all_ids),
+            source=self.provider.attribution,
+        )
 
 
 def build_runtime(config_path: Path, data_dir: Path) -> Runtime:
+    if not config_path.exists():
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        save_config(config_path, AppConfig())
     cfg = load_config(config_path)
     sec = Secrets.from_env()
     provider = make_provider(cfg, sec)
@@ -74,8 +106,8 @@ def build_runtime(config_path: Path, data_dir: Path) -> Runtime:
         secrets=sec,
         provider=provider,
         transitous=transitous,
-        poller=None,
-        devices=DeviceStore(data_dir / "devices.json"),  # type: ignore[arg-type]
+        poller=None,  # type: ignore[arg-type]
+        devices=DeviceStore(data_dir / "devices.json"),
         notifier=LeaveNotifier(sec.notify_webhook_url),
     )
     rt.poller = Poller(provider, lambda: rt.cfg, rt.needed)
@@ -89,20 +121,56 @@ def rt_dep(request: Request) -> Runtime:
 RT = Annotated[Runtime, Depends(rt_dep)]
 
 
-def require_token(rt: RT, x_edit_token: Annotated[str | None, Header()] = None) -> None:
-    expected = rt.secrets.edit_token
-    if not expected:
-        raise HTTPException(403, "Bearbeiten deaktiviert: EDIT_TOKEN ist nicht gesetzt")
-    if not x_edit_token or not pysecrets.compare_digest(x_edit_token, expected):
-        raise HTTPException(401, "Token fehlt oder ist falsch")
-
-
-Token = Annotated[None, Depends(require_token)]
+# --------------------------------------------------------------------------- #
+# Request-/Response-Modelle
+# --------------------------------------------------------------------------- #
 
 
 class ProfileChange(BaseModel):
     profile: str | None = None
     step: int | None = None  # +1 / -1 für Taster B / A
+
+
+class ConnectionQuery(BaseModel):
+    origin: Place
+    destination: Place
+
+
+class ScheduleIn(BaseModel):
+    days: list[str]
+    start: str = Field(alias="from")
+    end: str = Field(alias="to")
+
+
+class TemplateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    origin: Place
+    destination: Place
+    options: list[setup_assistant.ConnectionOption] = Field(min_length=1)
+    schedule: ScheduleIn | None = None
+
+
+class NightIn(BaseModel):
+    enabled: bool = True
+    start: str = Field("23:00", alias="from")
+    end: str = Field("06:00", alias="to")
+    mode: Literal["dim", "off"] = "dim"
+
+
+class SettingsIn(BaseModel):
+    night: NightIn
+
+
+def _no_template_board(rt: Runtime, now: datetime) -> Board:
+    return Board(
+        generated_at=now,
+        profile="",
+        profiles=[],
+        title="Keine Vorlage",
+        display=DisplayState(mode=DisplayMode.ON, brightness=rt.cfg.brightness),
+        messages=["Im Web-UI eine Vorlage anlegen"],
+        source=rt.provider.attribution,
+    )
 
 
 def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> FastAPI:
@@ -134,29 +202,18 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
         now = rt.now()
         rt.devices.touch(device, now)
         profile = rt.devices.profile(rt.cfg, device, now)
+        if profile is None:
+            return _no_template_board(rt, now)
         night = rt.devices.night(rt.cfg, device, now)
-        ids_by_stop = rt.station_ids(profile)
-        all_ids = {i for ids in ids_by_stop.values() for i in ids}
-        await rt.poller.ensure_loaded(all_ids)
-        deps_by_stop = {
-            name: [d for sid in ids for d in rt.poller.departures(sid)] for name, ids in ids_by_stop.items()
-        }
-        result, trigger = board.build_board(
-            rt.cfg,
-            profile,
-            deps_by_stop,
-            now,
-            night=night,
-            stale_since=rt.poller.stale_since(all_ids),
-            source=rt.provider.attribution,
-        )
+        await rt.poller.ensure_loaded({i for ids in rt.station_ids(profile).values() for i in ids})
+        result, trigger = rt.build(profile, now, night=night)
         p = rt.cfg.profiles[profile]
         if trigger and p.leave and p.leave.notify and result.leave_signal == "ideal":
             await rt.notifier.maybe_send(profile, p.title, trigger[0], trigger[1], now)
         return result
 
     @app.post("/api/device/{device}/profile")
-    async def change_profile(rt: RT, device: str, body: ProfileChange) -> dict[str, str]:
+    async def change_profile(rt: RT, device: str, body: ProfileChange) -> dict[str, str | None]:
         now = rt.now()
         try:
             if body.profile:
@@ -166,7 +223,7 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
             else:
                 raise HTTPException(422, "profile oder step angeben")
         except KeyError:
-            raise HTTPException(404, f"Profil unbekannt: {body.profile}") from None
+            raise HTTPException(404, f"Vorlage unbekannt: {body.profile}") from None
         return {"profile": rt.devices.profile(rt.cfg, device, now)}
 
     @app.post("/api/device/{device}/night")
@@ -185,6 +242,125 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
         return {"status": "ok"}
 
     # ------------------------------------------------------------------ #
+    # Vorlagen-Assistent
+    # ------------------------------------------------------------------ #
+
+    @app.get("/api/places", response_model=list[setup_assistant.PlaceSuggestion])
+    async def places(rt: RT, q: str = Query(..., min_length=3, max_length=100)):
+        try:
+            return await setup_assistant.places(rt.transitous, q, rt.cfg.region)
+        except ProviderError as e:
+            raise HTTPException(502, "Adresssuche gerade nicht erreichbar") from e
+
+    @app.post("/api/connections", response_model=list[setup_assistant.ConnectionOption])
+    async def connections(rt: RT, body: ConnectionQuery):
+        try:
+            return await setup_assistant.connections(rt.transitous, body.origin, body.destination)
+        except ProviderError as e:
+            raise HTTPException(502, "Verbindungssuche gerade nicht erreichbar") from e
+
+    @app.get("/api/templates")
+    async def list_templates(rt: RT) -> dict[str, Any]:
+        now = rt.now()
+        rt.ui_seen = now
+        all_ids = {i for p in rt.cfg.profiles for ids in rt.station_ids(p).values() for i in ids}
+        await rt.poller.ensure_loaded(all_ids)
+        out = []
+        for name, p in rt.cfg.profiles.items():
+            b, _ = rt.build(name, now)
+            out.append(
+                {
+                    "name": name,
+                    "origin": p.origin,
+                    "destination": p.destination,
+                    "stops": [
+                        {
+                            "name": s.name,
+                            "walk_minutes": s.walk_minutes,
+                            "routes": [{"line": r.line, "headsign": r.headsign} for r in s.routes],
+                        }
+                        for s in p.stops
+                    ],
+                    "schedule": [
+                        {"days": e.days, "from": e.start.strftime("%H:%M"), "to": e.end.strftime("%H:%M")}
+                        for e in rt.cfg.schedule
+                        if e.profile == name
+                    ],
+                    "next": [r.model_dump(mode="json") for r in _next_two(b.rows)],
+                    "stale": b.stale,
+                }
+            )
+        devices = {d: rt.devices.profile(rt.cfg, d, now) for d in rt.devices.active_devices(now)}
+        return {"templates": out, "devices": devices, "source": rt.provider.attribution}
+
+    @app.post("/api/templates")
+    async def save_template(rt: RT, body: TemplateIn) -> dict[str, str]:
+        name = body.name.strip()
+        profile = setup_assistant.build_profile(rt.cfg, name, body.origin, body.destination, body.options)
+        cfg = rt.cfg.model_copy(deep=True)
+        cfg.profiles[name] = profile
+        cfg.schedule = [e for e in cfg.schedule if e.profile != name]
+        if body.schedule and body.schedule.days:
+            try:
+                cfg.schedule.append(
+                    ScheduleEntry.model_validate(
+                        {
+                            "profile": name,
+                            "days": body.schedule.days,
+                            "from": body.schedule.start,
+                            "to": body.schedule.end,
+                        }
+                    )
+                )
+            except ValueError as e:
+                raise HTTPException(422, f"Zeitplan ungültig: {e}") from e
+        rt.save(AppConfig.model_validate(cfg.model_dump(by_alias=True)))
+        return {"status": "gespeichert", "name": name}
+
+    @app.delete("/api/templates/{name}")
+    async def delete_template(rt: RT, name: str) -> dict[str, str]:
+        if name not in rt.cfg.profiles:
+            raise HTTPException(404, "Vorlage unbekannt")
+        cfg = rt.cfg.model_copy(deep=True)
+        del cfg.profiles[name]
+        cfg.schedule = [e for e in cfg.schedule if e.profile != name]
+        if cfg.default_profile == name:
+            cfg.default_profile = None
+        rt.save(AppConfig.model_validate(cfg.model_dump(by_alias=True)))
+        return {"status": "gelöscht"}
+
+    # ------------------------------------------------------------------ #
+    # Einstellungen (Nachtmodus)
+    # ------------------------------------------------------------------ #
+
+    @app.get("/api/settings")
+    async def get_settings(rt: RT) -> dict[str, Any]:
+        n = rt.cfg.night
+        return {
+            "night": {
+                "enabled": n is not None,
+                "from": n.start.strftime("%H:%M") if n else "23:00",
+                "to": n.end.strftime("%H:%M") if n else "06:00",
+                "mode": n.mode if n else "dim",
+            }
+        }
+
+    @app.put("/api/settings")
+    async def put_settings(rt: RT, body: SettingsIn) -> dict[str, str]:
+        cfg = rt.cfg.model_copy(deep=True)
+        if body.night.enabled:
+            try:
+                cfg.night = NightConfig.model_validate(
+                    {"from": body.night.start, "to": body.night.end, "mode": body.night.mode}
+                )
+            except ValueError as e:
+                raise HTTPException(422, f"Uhrzeit ungültig: {e}") from e
+        else:
+            cfg.night = None
+        rt.save(cfg)
+        return {"status": "gespeichert"}
+
+    # ------------------------------------------------------------------ #
     # Stationssuche, Status
     # ------------------------------------------------------------------ #
 
@@ -192,11 +368,7 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
     async def stations(
         rt: RT, q: str = Query(..., min_length=2, max_length=100), provider: str | None = None
     ) -> list[StationMatch]:
-        p: DepartureProvider = rt.provider
-        if provider == "transitous":
-            p = rt.transitous
-        elif provider == "rmv" and rt.provider.name != "rmv":
-            raise HTTPException(400, "RMV nicht aktiv (RMV_API_KEY fehlt)")
+        p: DepartureProvider = rt.transitous if provider == "transitous" else rt.provider
         try:
             return await p.search_stations(q)
         except ProviderError as e:
@@ -209,25 +381,13 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
 
     @app.get("/api/status")
     async def status(rt: RT) -> dict[str, Any]:
-        now = rt.now()
         needed = rt.needed()
         return {
             "version": __version__,
             "provider": rt.provider.name,
-            "provider_configured": rt.cfg.provider,
             "attribution": rt.provider.attribution,
             "interval_seconds": rt.poller.interval(len(needed)),
-            "editing_enabled": bool(rt.secrets.edit_token),
             "notify_enabled": bool(rt.secrets.notify_webhook_url),
-            "profiles": list(rt.cfg.profiles),
-            "devices": {
-                d: {
-                    "profile": rt.devices.profile(rt.cfg, d, now),
-                    "night": rt.devices.night(rt.cfg, d, now),
-                    "last_seen": rt.devices.get(d).last_seen,
-                }
-                for d in rt.devices.devices
-            },
             "stations": {
                 sid: {
                     "ok": e.last_ok,
@@ -241,69 +401,15 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
             },
         }
 
-    # ------------------------------------------------------------------ #
-    # Config bearbeiten (Token)
-    # ------------------------------------------------------------------ #
-
-    @app.get("/api/config", response_class=PlainTextResponse)
-    async def get_config(rt: RT, _: Token) -> str:
-        return rt.config_path.read_text(encoding="utf-8")
-
-    @app.put("/api/config")
-    async def put_config(
-        rt: RT, _: Token, text: Annotated[str, Body(media_type="text/plain")]
-    ) -> dict[str, str]:
-        try:
-            new = parse_config_text(text)
-        except Exception as e:  # YAML- oder Validierungsfehler → zurück ans UI
-            raise HTTPException(422, f"Config ungültig: {e}") from e
-        if resolve_provider(new, rt.secrets) != rt.provider.name:
-            raise HTTPException(422, "Provider-Wechsel braucht einen Neustart des Containers")
-        backup = rt.config_path.with_suffix(".yaml.bak")
-        backup.write_text(rt.config_path.read_text(encoding="utf-8"), encoding="utf-8")
-        rt.config_path.write_text(text, encoding="utf-8")
-        rt.cfg = new
-        return {"status": "gespeichert", "backup": backup.name}
-
-    # ------------------------------------------------------------------ #
-    # Einrichtungs-Assistent (Token, weil Adressen nach außen gehen)
-    # ------------------------------------------------------------------ #
-
-    @app.get("/api/setup/nearby")
-    async def setup_nearby(rt: RT, _: Token, address: str = Query(..., min_length=3), radius: int = 800):
-        try:
-            home = await setup_assistant.geocode(rt.transitous, address)
-            return {
-                "home": home,
-                "stops": await setup_assistant.nearby(rt.transitous, home, min(radius, 2000)),
-            }
-        except LookupError as e:
-            raise HTTPException(404, str(e)) from e
-        except ProviderError as e:
-            raise HTTPException(502, str(e)) from e
-
-    @app.get("/api/setup/route")
-    async def setup_route(
-        rt: RT, _: Token, home: str = Query(..., min_length=3), work: str = Query(..., min_length=3)
-    ):
-        try:
-            h = await setup_assistant.geocode(rt.transitous, home)
-            w = await setup_assistant.geocode(rt.transitous, work)
-            return {"home": h, "work": w, "suggestions": await setup_assistant.route(rt.transitous, h, w)}
-        except LookupError as e:
-            raise HTTPException(404, str(e)) from e
-        except ProviderError as e:
-            raise HTTPException(502, str(e)) from e
-
-    # ------------------------------------------------------------------ #
-    # Web-UI
-    # ------------------------------------------------------------------ #
-
     @app.get("/", include_in_schema=False)
     async def index() -> FileResponse:
         return FileResponse(WEB / "index.html")
 
     return app
+
+
+def _next_two(rows: list[BoardRow]) -> list[BoardRow]:
+    return [r for r in rows if not r.cancelled][:2]
 
 
 logging.basicConfig(

@@ -5,7 +5,16 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 
-from .config import WEEKDAYS, AppConfig, LeaveConfig, ProfileConfig, StopConfig, TextFilter, TimeWindow
+from .config import (
+    WEEKDAYS,
+    AppConfig,
+    LeaveConfig,
+    ProfileConfig,
+    RouteMatch,
+    StopConfig,
+    TextFilter,
+    TimeWindow,
+)
 from .models import (
     Board,
     BoardRow,
@@ -31,11 +40,11 @@ def in_window(w: TimeWindow, now: datetime) -> bool:
     return (today in w.days and t >= w.start) or (yesterday in w.days and t < w.end)
 
 
-def scheduled_profile(cfg: AppConfig, now: datetime) -> str:
+def scheduled_profile(cfg: AppConfig, now: datetime) -> str | None:
     for entry in cfg.schedule:
-        if in_window(entry, now):
+        if in_window(entry, now) and entry.profile in cfg.profiles:
             return entry.profile
-    return cfg.default_profile
+    return cfg.fallback_profile
 
 
 def is_night(cfg: AppConfig, now: datetime) -> bool:
@@ -68,7 +77,19 @@ def passes_filters(dep: Departure, stop: StopConfig) -> bool:
         return False
     if not _line_ok(stop.lines, dep.line):
         return False
+    if stop.routes and not any(route_hit(r, dep) for r in stop.routes):
+        return False
     return stop.direction.matches(dep.direction)
+
+
+def route_hit(r: RouteMatch, dep: Departure) -> bool:
+    if r.line.strip().casefold() != dep.line.strip().casefold():
+        return False
+    if r.direction_id is not None and dep.direction_id is not None:
+        return r.direction_id == dep.direction_id
+    if r.headsign:
+        return r.headsign.casefold() in dep.direction.casefold()
+    return True
 
 
 def _line_ok(f: TextFilter, line: str) -> bool:
@@ -131,7 +152,7 @@ def leave_candidates(
         (d, s)
         for d, s in items
         if not d.cancelled
-        and d.line.casefold() == leave.line.casefold()
+        and (leave.line is None or d.line.casefold() == leave.line.casefold())
         and f.matches(d.direction)
         and (leave.stop is None or leave.stop == s.name)
     ]

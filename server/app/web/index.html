@@ -6,13 +6,12 @@
 <title>Mini-Haltestelle</title>
 <style>
   :root {
-    --bg: #f4f5f2; --card: #ffffff; --ink: #1d2320; --muted: #66706a; --line: #dde1dc;
-    --accent: #1f7a45; --accent-ink: #ffffff; --warn: #b85c00; --err: #b3261e;
-    --dfi-bg: #0b0d10; --dfi-ink: #f4d35e; --dfi-muted: #8b96a3;
+    --bg: #f4f5f2; --card: #ffffff; --ink: #1d2320; --muted: #66706a; --line: #dde1dc; --soft: #eef1ec;
+    --accent: #1f7a45; --accent-ink: #ffffff; --warn: #b85c00; --err: #b3261e; --focus: #1f7a45;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #121513; --card: #1b1f1c; --ink: #e7ebe7; --muted: #9aa49d; --line: #2d332f;
-            --accent: #4bb377; --accent-ink: #08130c; --warn: #f0a050; --err: #f2867d; }
+    :root { --bg: #121513; --card: #1b1f1c; --ink: #e7ebe7; --muted: #9aa49d; --line: #2d332f; --soft: #232825;
+            --accent: #4bb377; --accent-ink: #08130c; --warn: #f0a050; --err: #f2867d; --focus: #4bb377; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
@@ -21,284 +20,430 @@
   header h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; }
   .h-sign { width: 24px; height: 24px; border-radius: 50%; background: #1f8a3c; color: #f6d200;
             display: inline-grid; place-items: center; font-weight: 800; font-size: 15px; }
-  header .meta { color: var(--muted); font-size: 13px; margin-left: auto; }
+  header .meta { color: var(--muted); font-size: 12px; margin-left: auto; }
+  header a { color: inherit; }
   main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; display: grid; gap: 18px;
-         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+         grid-template-columns: minmax(0, 380px) minmax(0, 1fr); align-items: start; }
   @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
-  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
   section.wide { grid-column: 1 / -1; }
-  h2 { font-size: 15px; margin: 0 0 12px; }
+  .stack { display: grid; gap: 18px; min-width: 0; }
+  h2 { font-size: 16px; margin: 0 0 4px; }
+  .lead { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
   label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
-  input, select, textarea, button { font: inherit; color: inherit; }
-  input, select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
-  textarea { font: 13px/1.5 ui-monospace, "Cascadia Code", Menlo, monospace; min-height: 420px; resize: vertical; }
-  button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; }
+  input, select, button { font: inherit; color: inherit; }
+  input[type=text], input[type=time], select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  button { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; }
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  .row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
-  .row > * { flex: 1 1 140px; }
-  .row > button { flex: 0 0 auto; }
-  .msg { font-size: 13px; margin-top: 8px; min-height: 1.2em; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.link { border: 0; background: none; padding: 4px 6px; color: var(--muted); text-decoration: underline; }
+  button.danger { color: var(--err); }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 1.2em; color: var(--muted); }
   .msg.err { color: var(--err); } .msg.ok { color: var(--accent); }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
-  th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 500; }
-  td code, pre { font: 12px ui-monospace, Menlo, monospace; }
-  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; overflow-x: auto; margin: 8px 0 0; }
   .small { font-size: 12px; color: var(--muted); }
 
+  /* ---------- Schritte ---------- */
+  .step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; margin-bottom: 14px; }
+  .step-n { width: 26px; height: 26px; border-radius: 50%; background: var(--soft); color: var(--muted);
+            display: grid; place-items: center; font-size: 13px; font-weight: 700; margin-top: 22px; }
+  .step.done .step-n { background: var(--accent); color: var(--accent-ink); }
+  .ac { position: relative; }
+  .ac-list { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 2px); background: var(--card);
+             border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 8px 24px rgb(0 0 0 / .18);
+             list-style: none; margin: 0; padding: 4px; max-height: 280px; overflow-y: auto; }
+  .ac-list li { padding: 7px 9px; border-radius: 4px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  .ac-list li[aria-selected=true], .ac-list li:hover { background: var(--soft); }
+  .ac-list .kind { font-size: 11px; color: var(--muted); flex: 0 0 auto; width: 58px; }
+  .chosen { font-size: 12px; color: var(--accent); margin-top: 3px; min-height: 1em; }
+
+  .station { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .station-h { background: var(--soft); padding: 7px 10px; font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
+  .station-h .walk { font-weight: 400; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .opt { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+         padding: 8px 10px; border-top: 1px solid var(--line); cursor: pointer; }
+  .opt:first-of-type { border-top: 0; }
+  .opt input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); }
+  .opt .dir { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opt .dur { font-size: 13px; color: var(--muted); white-space: nowrap; text-align: right; }
+  .lbadge { display: inline-grid; place-items: center; min-width: 38px; height: 22px; padding: 0 5px; border-radius: 4px;
+            color: #fff; font-weight: 700; font-size: 13px; }
+  .days { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0 8px; }
+  .days label { margin: 0; }
+  .days input { position: absolute; opacity: 0; }
+  .days span { display: inline-grid; place-items: center; width: 36px; height: 30px; border: 1px solid var(--line);
+               border-radius: 6px; font-size: 13px; color: var(--ink); cursor: pointer; }
+  .days input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .days input:focus-visible + span { outline: 2px solid var(--focus); }
+  .row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+  .row > div { flex: 1 1 110px; }
+  .check { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 14px; margin: 6px 0; cursor: pointer; }
+  .check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+
+  /* ---------- Vorlagen ---------- */
+  .tpls { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .tpl { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+  .tpl-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .tpl-h b { font-size: 16px; }
+  .pill { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: var(--soft); color: var(--muted); }
+  .pill.live { background: var(--accent); color: var(--accent-ink); }
+  .route { font-size: 14px; }
+  .route .arrow { color: var(--muted); padding: 0 4px; }
+  .via { font-size: 13px; color: var(--muted); }
+  .next { display: grid; gap: 6px; background: var(--soft); border-radius: 8px; padding: 8px 10px; }
+  .next-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 14px; }
+  .next-row .dir { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .next-row .t { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .next-row .t small { font-weight: 400; color: var(--muted); }
+  .late { color: var(--warn); }
+  .tpl-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty-state { color: var(--muted); padding: 10px 0; }
+
   /* ---------- Display-Vorschau 320×240 ---------- */
-  .preview-wrap { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
-  .bezel { background: #222; padding: 14px; border-radius: 10px; display: inline-flex; gap: 10px; align-items: center; }
-  .btncol { display: flex; flex-direction: column; gap: 46px; }
-  .hwbtn { width: 30px; height: 30px; border-radius: 50%; border: 0; background: #444; color: #ddd; font-weight: 700; font-size: 12px; padding: 0; }
+  .bezel { background: #222; padding: 12px; border-radius: 10px; display: inline-flex; gap: 8px; align-items: center; max-width: 100%; }
+  .btncol { display: flex; flex-direction: column; gap: 40px; align-items: center; }
+  .hwbtn { width: 28px; height: 28px; border-radius: 50%; border: 0; background: #444; color: #ddd; font-weight: 700; font-size: 12px; padding: 0; }
   .hwbtn:active { background: #666; }
-  .led { width: 10px; height: 10px; border-radius: 50%; background: #333; margin: 0 auto; }
-  .screen-scale { width: 320px; height: 240px; overflow: hidden; }
-  .screen { width: 320px; height: 240px; transform-origin: 0 0; background: var(--dfi-bg); color: var(--dfi-ink);
-            font-family: "DejaVu Sans", "Inter", system-ui, sans-serif; position: relative; overflow: hidden; }
-  .screen.light { background: #f7f7f2; color: #121212; --dfi-muted: #667; }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+  .screen-scale { width: 256px; height: 192px; overflow: hidden; }
+  .screen { width: 320px; height: 240px; transform: scale(.8); transform-origin: 0 0; background: #0b0d10; color: #f4d35e;
+            font-family: "DejaVu Sans", "Inter", system-ui, sans-serif; position: relative; overflow: hidden; --m: #8b96a3; }
   .screen.dim { filter: brightness(.35); } .screen.off { filter: brightness(0); }
   .scr-head { height: 26px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px;
-              font-size: 14px; font-weight: 700; border-bottom: 1px solid #2a2f36; }
-  .screen.light .scr-head { border-color: #ccc; }
-  .scr-rows { padding: 2px 0; }
+              font-size: 14px; font-weight: 700; border-bottom: 1px solid #2a2f36; gap: 8px; }
+  .scr-head span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scr-row { height: 31px; display: flex; align-items: center; padding: 0 8px; gap: 8px; font-size: 16px; }
-  .badge { min-width: 40px; height: 22px; border-radius: 4px; color: #fff; font-weight: 700; font-size: 14px;
-           display: grid; place-items: center; padding: 0 4px; }
-  .badge.S { border-radius: 11px; }
-  .dir { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mins { font-weight: 700; min-width: 46px; text-align: right; }
-  .late { color: #ff9f40; } .verylate { color: #ff5a4f; }
-  .cancel .dir, .cancel .mins { text-decoration: line-through; color: var(--dfi-muted); }
-  .scr-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; font-size: 12px; color: var(--dfi-muted);
+  .scr-row .badge { min-width: 40px; height: 22px; border-radius: 4px; color: #fff; font-weight: 700; font-size: 14px; display: grid; place-items: center; padding: 0 4px; }
+  .scr-row .d { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scr-row .m { font-weight: 700; min-width: 46px; text-align: right; }
+  .scr-row .lt { color: #ff9f40; } .scr-row .vl { color: #ff5a4f; }
+  .scr-row.x .d, .scr-row.x .m { text-decoration: line-through; color: var(--m); }
+  .scr-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; font-size: 12px; color: var(--m);
               border-top: 1px solid #2a2f36; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
-  .screen.light .scr-foot { border-color: #ccc; }
   .marquee { display: inline-block; padding-left: 100%; animation: mq 18s linear infinite; }
   @keyframes mq { to { transform: translateX(-100%); } }
   .offline { position: absolute; right: 6px; top: 30px; font-size: 11px; background: #b3261e; color: #fff; padding: 1px 5px; border-radius: 3px; }
-  .empty { padding: 60px 10px; text-align: center; color: var(--dfi-muted); font-size: 14px; }
+  .scr-empty { padding: 60px 10px; text-align: center; color: var(--m); font-size: 14px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  th, td { text-align: left; padding: 5px; border-bottom: 1px solid var(--line); }
+  td code { font-size: 11px; }
 </style>
 </head>
 <body>
 <header>
   <h1><span class="h-sign">H</span> Mini-Haltestelle</h1>
-  <span class="meta" id="meta">…</span>
+  <span class="meta" id="meta"></span>
 </header>
+
 <main>
-  <section>
-    <h2>Live-Vorschau</h2>
-    <div class="row" style="margin-bottom:12px">
-      <div><label for="device">Gerät</label><input id="device" value="pi"></div>
-      <div><label for="theme">Theme</label>
-        <select id="theme"><option value="dark">Dunkel (DFI)</option><option value="light">Hell</option></select></div>
-    </div>
-    <div class="preview-wrap">
+  <div class="stack">
+    <section aria-labelledby="h-display">
+      <h2 id="h-display">Display</h2>
+      <p class="lead">So sieht es gerade auf dem Gerät aus. A/B wechselt die Vorlage, X Nachtmodus, Y neu laden.</p>
       <div class="bezel">
-        <div class="btncol"><button class="hwbtn" data-btn="A" title="Profil zurück">A</button><button class="hwbtn" data-btn="B" title="Profil vor">B</button></div>
+        <div class="btncol"><button class="hwbtn" data-btn="A" title="Vorherige Vorlage">A</button><button class="hwbtn" data-btn="B" title="Nächste Vorlage">B</button></div>
         <div class="screen-scale"><div class="screen" id="screen"></div></div>
-        <div class="btncol"><button class="hwbtn" data-btn="X" title="Nachtmodus">X</button><div class="led" id="led"></div><button class="hwbtn" data-btn="Y" title="Neu laden">Y</button></div>
+        <div class="btncol"><button class="hwbtn" data-btn="X" title="Nachtmodus an/aus">X</button><span class="led" id="led" title="LED: grün = jetzt los, orange = knapp"></span><button class="hwbtn" data-btn="Y" title="Neu laden">Y</button></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-night">
+      <h2 id="h-night">Nachtmodus</h2>
+      <p class="lead">In dieser Zeit wird das Display dunkel und die LED bleibt aus.</p>
+      <label class="check"><input type="checkbox" id="nightOn"> Nachtmodus verwenden</label>
+      <div class="row">
+        <div><label for="nightFrom">von</label><input type="time" id="nightFrom" value="23:00"></div>
+        <div><label for="nightTo">bis</label><input type="time" id="nightTo" value="06:00"></div>
+        <div><label for="nightMode">Display</label><select id="nightMode"><option value="dim">gedimmt</option><option value="off">aus</option></select></div>
+      </div>
+      <div class="row" style="margin-top:10px"><button id="nightSave">Speichern</button></div>
+      <div class="msg" id="nightMsg" role="status"></div>
+    </section>
+  </div>
+
+  <section aria-labelledby="h-new">
+    <h2 id="h-new">Neue Vorlage</h2>
+    <p class="lead">Start und Ziel eingeben, Verbindungen auswählen, unter einem Namen speichern.</p>
+
+    <div class="step" id="stepStart">
+      <span class="step-n">1</span>
+      <div class="ac">
+        <label for="start">Start</label>
+        <input type="text" id="start" placeholder="z. B. Straße Hausnummer" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="startList" aria-autocomplete="list">
+        <ul class="ac-list" id="startList" role="listbox" hidden></ul>
+        <div class="chosen" id="startChosen"></div>
       </div>
     </div>
-    <p class="small">Die Taster rufen dieselben Endpunkte auf wie das Gerät. Das echte Display rendert der Client (Phase 2);
-      diese Vorschau zeigt Inhalt und Layout.</p>
+    <div class="step" id="stepZiel">
+      <span class="step-n">2</span>
+      <div class="ac">
+        <label for="ziel">Ziel</label>
+        <input type="text" id="ziel" placeholder="z. B. Arbeit, Stadtteil oder Haltestelle" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="zielList" aria-autocomplete="list">
+        <ul class="ac-list" id="zielList" role="listbox" hidden></ul>
+        <div class="chosen" id="zielChosen"></div>
+        <div class="row" style="margin-top:10px"><button class="primary" id="searchBtn" disabled>Verbindung suchen</button></div>
+        <div class="msg" id="searchMsg" role="status"></div>
+      </div>
+    </div>
+    <div class="step" id="stepPick" hidden>
+      <span class="step-n">3</span>
+      <div>
+        <label>Haltestellen in der Nähe — alles ankreuzen, was auf dem Display erscheinen soll</label>
+        <div id="options"></div>
+      </div>
+    </div>
+    <div class="step" id="stepSave" hidden>
+      <span class="step-n">4</span>
+      <div>
+        <label for="tplName">Name der Vorlage</label>
+        <input type="text" id="tplName" maxlength="40" placeholder="z. B. Arbeit">
+        <label class="check" style="margin-top:10px"><input type="checkbox" id="autoOn"> Automatisch anzeigen</label>
+        <div id="autoBox" hidden>
+          <div class="days" id="days"></div>
+          <div class="row">
+            <div><label for="autoFrom">von</label><input type="time" id="autoFrom" value="06:00"></div>
+            <div><label for="autoTo">bis</label><input type="time" id="autoTo" value="10:00"></div>
+          </div>
+        </div>
+        <p class="small">Ohne Zeitangabe wechselst du am Gerät mit A/B zu dieser Vorlage.</p>
+        <div class="row"><button class="primary" id="saveBtn">Als Vorlage speichern</button></div>
+        <div class="msg" id="saveMsg" role="status"></div>
+      </div>
+    </div>
   </section>
 
-  <section>
-    <h2>Gehzeit-Assistent</h2>
-    <p class="small" style="margin-top:0">Findet Stationen bis 800 m um eine Adresse und berechnet den Fußweg über OpenStreetMap
-      (Transitous). Die Adresse geht dafür einmal an Transitous und wird nicht gespeichert.</p>
-    <div class="row">
-      <div><label for="home">Startadresse</label><input id="home" placeholder="Straße Hausnummer, Ort"></div>
-      <button id="nearbyBtn">Stationen suchen</button>
-    </div>
-    <div class="msg" id="nearbyMsg"></div>
-    <div id="nearbyOut"></div>
-    <div class="row" style="margin-top:14px">
-      <div><label for="work">Zieladresse (für „Jetzt los")</label><input id="work" placeholder="z. B. Arbeit"></div>
-      <button id="routeBtn">Verbindung vorschlagen</button>
-    </div>
-    <div class="msg" id="routeMsg"></div>
-    <div id="routeOut"></div>
-  </section>
-
-  <section>
-    <h2>Stationssuche</h2>
-    <div class="row">
-      <div><label for="q">Name</label><input id="q" placeholder="z. B. Merianplatz"></div>
-      <div style="flex:0 1 150px"><label for="prov">Provider</label>
-        <select id="prov"><option value="">aktiver</option><option value="transitous">transitous</option><option value="rmv">rmv</option></select></div>
-      <button id="searchBtn">Suchen</button>
-    </div>
-    <div class="msg" id="searchMsg"></div>
-    <div id="searchOut"></div>
-  </section>
-
-  <section>
-    <h2>Status</h2>
-    <div id="statusOut" class="small">…</div>
-  </section>
-
-  <section class="wide">
-    <h2>Konfiguration</h2>
-    <div class="row" style="margin-bottom:10px">
-      <div><label for="token">Bearbeitungs-Token (EDIT_TOKEN)</label><input id="token" type="password" autocomplete="off"></div>
-      <button id="loadBtn">Laden</button>
-      <button id="saveBtn" class="primary">Speichern</button>
-    </div>
-    <textarea id="cfg" spellcheck="false" placeholder="Token eingeben und „Laden“ drücken"></textarea>
-    <div class="msg" id="cfgMsg"></div>
+  <section class="wide" aria-labelledby="h-tpl">
+    <h2 id="h-tpl">Vorlagen</h2>
+    <p class="lead">Welche Verbindung wohin führt und wann die nächsten zwei Bahnen fahren, die du noch schaffst.</p>
+    <div class="tpls" id="tpls"><div class="empty-state">lädt …</div></div>
+    <details style="margin-top:16px"><summary>Technik</summary><div id="tech" class="small"></div></details>
   </section>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const store = {
-  get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
-};
-$('device').value = store.get('device', 'pi');
-$('theme').value = store.get('theme', 'dark');
-$('token').value = store.get('token', '');
-for (const id of ['device', 'theme', 'token']) $(id).addEventListener('change', () => { store.set(id, $(id).value); poll(); });
-
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const hdr = () => ({ 'X-Edit-Token': $('token').value });
+const DEVICE = 'pi';
+const COLORS = { S: '#3f9d3b', U: '#1c62b0', TRAM: '#d2232a', BUS: '#8e3d97', REGIO: '#6d7277', FERN: '#4a4f54', OTHER: '#6d7277' };
+const DAYS = [['mon', 'Mo'], ['tue', 'Di'], ['wed', 'Mi'], ['thu', 'Do'], ['fri', 'Fr'], ['sat', 'Sa'], ['sun', 'So']];
+const strip = (s) => String(s ?? '').replace(/^Frankfurt \(Main\)[ -]/, '').replace(/^Frankfurt am Main, /, '');
+const hhmm = (iso) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
   const ct = r.headers.get('content-type') || '';
   const body = ct.includes('json') ? await r.json() : await r.text();
-  if (!r.ok) throw new Error(body?.detail ? (typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)) : body || r.status);
+  if (!r.ok) {
+    const d = body && body.detail;
+    throw new Error(typeof d === 'string' ? d : Array.isArray(d) ? 'Eingabe unvollständig' : (body || r.status));
+  }
   return body;
 }
+const post = (path, body, method = 'POST') => api(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
 
-// ---------------- Vorschau ----------------
-let board = null;
-function minutesLabel(dep, now) {
-  const m = Math.floor((new Date(dep) - now) / 60000);
-  if (m <= 0) return 'jetzt';
-  if (m >= 60) return new Date(dep).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  return m + "'";
+// ================= Adresseingabe mit Vorschlägen =================
+const chosen = { start: null, ziel: null };
+function autocomplete(key) {
+  const input = $(key), list = $(key + 'List'), out = $(key + 'Chosen');
+  let timer = null, items = [], active = -1, seq = 0;
+  const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; };
+  const pick = (p) => {
+    chosen[key] = p; input.value = p.label; out.textContent = '✓ ' + p.label; close();
+    $('step' + (key === 'start' ? 'Start' : 'Ziel')).classList.add('done'); updateSearch();
+    if (key === 'start') $('ziel').focus();
+  };
+  const show = () => {
+    list.innerHTML = items.length ? items.map((p, i) =>
+      `<li role="option" id="${key}-o${i}" aria-selected="${i === active}" data-i="${i}"><span class="kind">${{ ADDRESS: 'Adresse', STOP: 'Haltestelle', PLACE: 'Ort' }[p.kind] || ''}</span><span>${esc(p.label)}</span></li>`).join('')
+      : '<li aria-disabled="true"><span class="kind"></span><span>Nichts gefunden</span></li>';
+    list.hidden = false; input.setAttribute('aria-expanded', 'true');
+    input.setAttribute('aria-activedescendant', active >= 0 ? `${key}-o${active}` : '');
+  };
+  input.addEventListener('input', () => {
+    chosen[key] = null; out.textContent = ''; $('step' + (key === 'start' ? 'Start' : 'Ziel')).classList.remove('done'); updateSearch();
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 3) { close(); return; }
+    timer = setTimeout(async () => {
+      const my = ++seq;
+      try { const res = await api('/api/places?q=' + encodeURIComponent(q)); if (my !== seq) return; items = res; active = -1; show(); }
+      catch (e) { out.textContent = e.message; }
+    }, 300);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (list.hidden) return;
+    if (e.key === 'ArrowDown') { active = Math.min(items.length - 1, active + 1); show(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { active = Math.max(0, active - 1); show(); e.preventDefault(); }
+    else if (e.key === 'Enter' && items.length) { pick(items[Math.max(0, active)]); e.preventDefault(); }
+    else if (e.key === 'Escape') close();
+  });
+  list.addEventListener('mousedown', (e) => { const li = e.target.closest('li[data-i]'); if (li) { e.preventDefault(); pick(items[+li.dataset.i]); } });
+  input.addEventListener('blur', () => setTimeout(close, 150));
 }
+autocomplete('start'); autocomplete('ziel');
+function updateSearch() { $('searchBtn').disabled = !(chosen.start && chosen.ziel); }
+
+// ================= Verbindungen =================
+let options = [];
+$('searchBtn').addEventListener('click', async () => {
+  const btn = $('searchBtn'); btn.disabled = true;
+  $('searchMsg').className = 'msg'; $('searchMsg').textContent = 'Suche Haltestellen und Verbindungen … (dauert ein paar Sekunden)';
+  $('stepPick').hidden = true; $('stepSave').hidden = true;
+  try {
+    options = await post('/api/connections', { origin: chosen.start, destination: chosen.ziel });
+    if (!options.length) { $('searchMsg').textContent = 'Keine Verbindung mit Bus oder Bahn gefunden.'; return; }
+    $('searchMsg').textContent = '';
+    renderOptions();
+    $('stepPick').hidden = false; $('stepSave').hidden = false;
+    if (!$('tplName').value) $('tplName').value = strip(chosen.ziel.name).slice(0, 40);
+  } catch (e) { $('searchMsg').className = 'msg err'; $('searchMsg').textContent = e.message; }
+  finally { updateSearch(); }
+});
+function renderOptions() {
+  const groups = new Map();
+  options.forEach((o, i) => { if (!groups.has(o.stop)) groups.set(o.stop, []); groups.get(o.stop).push(i); });
+  const best = options[0];
+  $('options').innerHTML = [...groups].map(([stop, idx]) => {
+    const walk = options[idx[0]].walk_minutes;
+    return `<div class="station"><div class="station-h"><span>${esc(strip(stop))}</span><span class="walk">🚶 ${Math.round(walk)} min</span></div>` +
+      idx.map((i) => {
+        const o = options[i];
+        const tr = o.transfers ? `, ${o.transfers}× umsteigen` : ', direkt';
+        return `<label class="opt"><input type="checkbox" data-i="${i}" ${o === best ? 'checked' : ''}>
+          <span class="lbadge" style="background:${esc(o.color || COLORS[o.product])}">${esc(o.line)}</span>
+          <span class="dir">→ ${esc(strip(o.headsign))}</span>
+          <span class="dur">ca. ${o.total_minutes} min bis zum Ziel${tr}</span></label>`;
+      }).join('') + '</div>';
+  }).join('');
+}
+
+// ================= Speichern =================
+$('days').innerHTML = DAYS.map(([k, l], i) => `<label><input type="checkbox" value="${k}" ${i < 5 ? 'checked' : ''}><span>${l}</span></label>`).join('');
+$('autoOn').addEventListener('change', () => { $('autoBox').hidden = !$('autoOn').checked; });
+$('saveBtn').addEventListener('click', async () => {
+  const msg = $('saveMsg'); msg.className = 'msg';
+  const picked = [...$('options').querySelectorAll('input:checked')].map((c) => options[+c.dataset.i]);
+  const name = $('tplName').value.trim();
+  if (!picked.length) { msg.className = 'msg err'; msg.textContent = 'Mindestens eine Verbindung ankreuzen.'; return; }
+  if (!name) { msg.className = 'msg err'; msg.textContent = 'Bitte einen Namen eingeben.'; $('tplName').focus(); return; }
+  if (templates.some((t) => t.name === name) && !confirm(`Vorlage „${name}" gibt es schon. Überschreiben?`)) return;
+  let schedule = null;
+  if ($('autoOn').checked) {
+    const days = [...$('days').querySelectorAll('input:checked')].map((c) => c.value);
+    if (!days.length) { msg.className = 'msg err'; msg.textContent = 'Mindestens einen Tag wählen.'; return; }
+    schedule = { days, from: $('autoFrom').value, to: $('autoTo').value };
+  }
+  try {
+    await post('/api/templates', { name, origin: chosen.start, destination: chosen.ziel, options: picked, schedule });
+    msg.className = 'msg ok'; msg.textContent = `„${name}" gespeichert.`;
+    loadTemplates(); poll();
+  } catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
+});
+
+// ================= Vorlagen-Übersicht =================
+let templates = [];
+const fmtDays = (d) => {
+  const keys = DAYS.map(([k]) => k);
+  if (d.length === 7) return 'täglich';
+  if (d.join() === keys.slice(0, 5).join()) return 'Mo–Fr';
+  if (d.join() === keys.slice(5).join()) return 'Sa–So';
+  return d.map((k) => DAYS.find(([x]) => x === k)[1]).join(', ');
+};
+async function loadTemplates() {
+  try {
+    const data = await api('/api/templates');
+    templates = data.templates;
+    const shown = data.devices[DEVICE];
+    $('tpls').innerHTML = templates.length ? templates.map((t) => {
+      const now = new Date();
+      const sched = t.schedule.length ? t.schedule.map((s) => `automatisch ${fmtDays(s.days)} ${s.from}–${s.to}`).join(' · ') : 'nur per Taster';
+      const via = t.stops.map((s) => `${esc(s.name)} (🚶 ${Math.round(s.walk_minutes)} min): ${s.routes.map((r) => esc(r.line)).join(', ')}`).join('<br>');
+      const next = t.next.length ? t.next.map((r) => {
+        const m = Math.max(0, Math.round((new Date(r.departure) - now) / 60000));
+        const late = r.delay_min > 0 ? ` <span class="late">+${r.delay_min}</span>` : '';
+        return `<div class="next-row"><span class="lbadge" style="background:${esc(r.color)}">${esc(r.line)}</span>
+          <span class="dir">${esc(r.direction)} <small class="small">ab ${esc(r.stop)}</small></span>
+          <span class="t">${hhmm(r.departure)}${late} <small>in ${m} min</small></span></div>`;
+      }).join('') : `<div class="small">${t.stale ? 'Daten gerade nicht abrufbar' : 'keine Abfahrt mehr, die du schaffst'}</div>`;
+      const from = t.origin ? esc(strip(t.origin.name)) : '?', to = t.destination ? esc(strip(t.destination.name)) : '?';
+      return `<article class="tpl">
+        <div class="tpl-h"><b>${esc(t.name)}</b>${t.name === shown ? '<span class="pill live">auf dem Display</span>' : ''}<span class="pill">${esc(sched)}</span></div>
+        <div class="route">${from}<span class="arrow">→</span>${to}</div>
+        <div class="via">${via}</div>
+        <div class="next">${next}</div>
+        <div class="tpl-actions">
+          ${t.name === shown ? '' : `<button data-show="${esc(t.name)}">Auf Display zeigen</button>`}
+          <button class="link danger" data-del="${esc(t.name)}">Löschen</button>
+        </div></article>`;
+    }).join('') : '<div class="empty-state">Noch keine Vorlage. Oben Start und Ziel eingeben.</div>';
+    $('meta').innerHTML = data.source === 'Transitous'
+      ? 'Daten: <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · © OpenStreetMap' : 'Daten: RMV';
+  } catch (e) { $('tpls').innerHTML = `<div class="empty-state">Server nicht erreichbar: ${esc(e.message)}</div>`; }
+}
+$('tpls').addEventListener('click', async (e) => {
+  const show = e.target.closest('[data-show]'), del = e.target.closest('[data-del]');
+  if (show) { await post(`/api/device/${DEVICE}/profile`, { profile: show.dataset.show }); loadTemplates(); poll(); }
+  if (del && confirm(`Vorlage „${del.dataset.del}" löschen?`)) {
+    await api('/api/templates/' + encodeURIComponent(del.dataset.del), { method: 'DELETE' }); loadTemplates(); poll();
+  }
+});
+
+// ================= Display-Vorschau =================
+let board = null;
+const minutesLabel = (dep, now) => { const m = Math.floor((new Date(dep) - now) / 60000); return m <= 0 ? 'jetzt' : m >= 60 ? hhmm(dep) : m + "'"; };
 function render() {
   const el = $('screen');
-  if (!board) { el.innerHTML = '<div class="empty">verbinde …</div>'; return; }
+  if (!board) { el.innerHTML = '<div class="scr-empty">verbinde …</div>'; return; }
   const now = new Date();
-  el.className = 'screen' + ($('theme').value === 'light' ? ' light' : '') + (board.display.mode !== 'on' ? ' ' + board.display.mode : '');
+  el.className = 'screen' + (board.display.mode !== 'on' ? ' ' + board.display.mode : '');
   const rows = board.rows.map((r) => {
-    const late = r.delay_min >= 5 ? 'verylate' : r.delay_min >= 2 ? 'late' : '';
-    return `<div class="scr-row${r.cancelled ? ' cancel' : ''}">
-      <span class="badge ${esc(r.product)}" style="background:${esc(r.color)}">${esc(r.line)}</span>
-      <span class="dir">${esc(r.direction)}</span>
-      <span class="mins ${late}">${r.cancelled ? 'fällt aus' : minutesLabel(r.departure, now)}</span></div>`;
-  }).join('') || '<div class="empty">keine erreichbaren Abfahrten</div>';
-  let foot = '';
-  if (board.messages.length) foot = `<span class="marquee">${esc(board.messages.join('  ·  '))}</span>`;
-  else foot = `&nbsp;Daten: ${esc(board.source)}`;
-  const off = board.stale && board.stale_since
-    ? `<div class="offline">offline seit ${Math.max(1, Math.round((now - new Date(board.stale_since)) / 60000))} min</div>` : '';
-  el.innerHTML = `<div class="scr-head"><span>${esc(board.title)}</span>
-      <span>${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></div>
-    <div class="scr-rows">${rows}</div>${off}<div class="scr-foot">${foot}</div>`;
+    const late = r.delay_min >= 5 ? 'vl' : r.delay_min >= 2 ? 'lt' : '';
+    return `<div class="scr-row${r.cancelled ? ' x' : ''}"><span class="badge" style="background:${esc(r.color)}">${esc(r.line)}</span>
+      <span class="d">${esc(r.direction)}</span><span class="m ${late}">${r.cancelled ? 'fällt aus' : minutesLabel(r.departure, now)}</span></div>`;
+  }).join('') || `<div class="scr-empty">${board.profile ? 'keine Abfahrt, die du noch schaffst' : 'keine Vorlage'}</div>`;
+  const foot = board.messages.length ? `<span class="marquee">${esc(board.messages.join('  ·  '))}</span>` : `&nbsp;Daten: ${esc(board.source)}`;
+  const off = board.stale && board.stale_since ? `<div class="offline">offline seit ${Math.max(1, Math.round((now - new Date(board.stale_since)) / 60000))} min</div>` : '';
+  el.innerHTML = `<div class="scr-head"><span>${esc(board.title)}</span><span>${hhmm(now)}</span></div><div>${rows}</div>${off}<div class="scr-foot">${foot}</div>`;
   const led = { ideal: '#2ecc40', hurry: '#ff9f1a' }[board.leave_signal];
-  $('led').style.background = led && board.display.mode === 'on' ? led : '#333';
-  $('led').style.boxShadow = led && board.display.mode === 'on' ? `0 0 8px ${led}` : 'none';
+  const on = led && board.display.mode === 'on';
+  $('led').style.background = on ? led : '#333'; $('led').style.boxShadow = on ? `0 0 8px ${led}` : 'none';
 }
-async function poll() {
-  try { board = await api('/api/board?device=' + encodeURIComponent($('device').value)); }
-  catch (e) { if (board) board.stale = true; }
-  render();
-}
+async function poll() { try { board = await api('/api/board?device=' + DEVICE); } catch { if (board) board.stale = true; } render(); }
 document.querySelectorAll('[data-btn]').forEach((b) => b.addEventListener('click', async () => {
-  const dev = encodeURIComponent($('device').value);
   const k = b.dataset.btn;
-  const post = (p, body) => api(`/api/device/${dev}/${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
-  if (k === 'A') await post('profile', { step: -1 });
-  if (k === 'B') await post('profile', { step: 1 });
-  if (k === 'X') await post('night');
-  if (k === 'Y') await post('refresh');
-  poll();
+  if (k === 'A') await post(`/api/device/${DEVICE}/profile`, { step: -1 });
+  if (k === 'B') await post(`/api/device/${DEVICE}/profile`, { step: 1 });
+  if (k === 'X') await post(`/api/device/${DEVICE}/night`);
+  if (k === 'Y') await post(`/api/device/${DEVICE}/refresh`);
+  poll(); loadTemplates();
 }));
 
-// ---------------- Status ----------------
-async function status() {
-  try {
-    const s = await api('/api/status');
-    $('meta').innerHTML = `v${esc(s.version)} · Provider <b>${esc(s.provider)}</b> · Intervall ${Math.round(s.interval_seconds)} s · `
-      + (s.provider === 'transitous' ? 'Daten: <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a>, © OpenStreetMap'
-        : 'Daten: RMV');
-    const st = Object.entries(s.stations).map(([id, e]) => `<tr><td><code>${esc(id)}</code></td><td>${e.polling ? 'aktiv' : 'pausiert'}</td>
-      <td>${e.ok ? new Date(e.ok).toLocaleTimeString('de-DE') : '–'}</td><td>${e.departures}</td><td>${e.requests}</td>
-      <td style="color:var(--err)">${esc(e.error || '')}</td></tr>`).join('');
-    const dv = Object.entries(s.devices).map(([d, e]) => `<tr><td>${esc(d)}</td><td>${esc(e.profile)}</td><td>${e.night ? 'Nacht' : 'Tag'}</td>
-      <td>${e.last_seen ? new Date(e.last_seen).toLocaleTimeString('de-DE') : '–'}</td></tr>`).join('');
-    $('statusOut').innerHTML = `<table><tr><th>Station</th><th>Poller</th><th>Stand</th><th>Abf.</th><th>Abrufe</th><th>Fehler</th></tr>${st || '<tr><td colspan=6>noch nichts abgefragt</td></tr>'}</table>
-      <table><tr><th>Gerät</th><th>Profil</th><th>Modus</th><th>zuletzt</th></tr>${dv || '<tr><td colspan=4>noch kein Gerät</td></tr>'}</table>
-      <p>Bearbeiten: ${s.editing_enabled ? 'an' : '<b>aus</b> (EDIT_TOKEN fehlt)'} · Push-Webhook: ${s.notify_enabled ? 'an' : 'aus'}</p>`;
-  } catch (e) { $('statusOut').textContent = 'Status nicht abrufbar: ' + e.message; }
+// ================= Nachtmodus =================
+async function loadSettings() {
+  const s = await api('/api/settings');
+  $('nightOn').checked = s.night.enabled; $('nightFrom').value = s.night.from; $('nightTo').value = s.night.to; $('nightMode').value = s.night.mode;
 }
-
-// ---------------- Stationssuche ----------------
-$('searchBtn').addEventListener('click', async () => {
-  $('searchMsg').className = 'msg'; $('searchMsg').textContent = 'suche …'; $('searchOut').innerHTML = '';
+$('nightSave').addEventListener('click', async () => {
   try {
-    const p = $('prov').value ? '&provider=' + $('prov').value : '';
-    const res = await api('/api/stations?q=' + encodeURIComponent($('q').value) + p);
-    $('searchMsg').textContent = res.length + ' Treffer';
-    $('searchOut').innerHTML = '<table><tr><th>Name</th><th>ID</th><th>Verkehrsmittel</th></tr>' + res.map((m) =>
-      `<tr><td>${esc(m.name)}</td><td><code>${esc(m.provider)}: ${esc(m.id)}</code></td><td>${esc(m.products.join(', '))}</td></tr>`).join('') + '</table>';
-  } catch (e) { $('searchMsg').className = 'msg err'; $('searchMsg').textContent = e.message; }
-});
-$('q').addEventListener('keydown', (e) => e.key === 'Enter' && $('searchBtn').click());
-
-// ---------------- Assistent ----------------
-const yq = (s) => JSON.stringify(s);
-$('nearbyBtn').addEventListener('click', async () => {
-  $('nearbyMsg').className = 'msg'; $('nearbyMsg').textContent = 'suche Stationen und Fußwege …'; $('nearbyOut').innerHTML = '';
-  try {
-    const r = await api('/api/setup/nearby?address=' + encodeURIComponent($('home').value), { headers: hdr() });
-    $('nearbyMsg').textContent = `Gefunden: ${r.home.name} (${r.stops.length} Stationen)`;
-    $('nearbyOut').innerHTML = '<table><tr><th></th><th>Station</th><th>Fußweg</th><th>Verkehrsmittel</th></tr>' + r.stops.map((s, i) =>
-      `<tr><td><input type="checkbox" data-i="${i}" ${i < 2 ? 'checked' : ''}></td><td>${esc(s.name)}</td>
-       <td>${s.walk_minutes == null ? '–' : s.walk_minutes + ' min'}</td><td>${esc(s.products.join(', '))}</td></tr>`).join('') + '</table>'
-      + '<p class="small">Gehzeit = OSM-Fußweg aufgerundet + 1 min Puffer. Auswahl als YAML für <code>stops:</code> eines Profils:</p><pre id="nearbyYaml"></pre>';
-    const upd = () => {
-      const sel = [...$('nearbyOut').querySelectorAll('input:checked')].map((c) => r.stops[+c.dataset.i]);
-      $('nearbyYaml').textContent = sel.map((s) => `- name: ${yq(s.name.replace(/^Frankfurt \(Main\) /, ''))}\n  ids:\n    transitous: ${s.transitous_ids.length === 1 ? yq(s.transitous_ids[0]) : '[' + s.transitous_ids.map(yq).join(', ') + ']'}\n    # rmv: über die Stationssuche nachtragen\n  walk_minutes: ${s.walk_minutes ?? 10}\n  products: [${s.products.join(', ')}]`).join('\n');
-    };
-    $('nearbyOut').addEventListener('change', upd); upd();
-  } catch (e) { $('nearbyMsg').className = 'msg err'; $('nearbyMsg').textContent = e.message; }
-});
-$('routeBtn').addEventListener('click', async () => {
-  $('routeMsg').className = 'msg'; $('routeMsg').textContent = 'plane Verbindungen …'; $('routeOut').innerHTML = '';
-  try {
-    const r = await api(`/api/setup/route?home=${encodeURIComponent($('home').value)}&work=${encodeURIComponent($('work').value)}`, { headers: hdr() });
-    if (!r.suggestions.length) { $('routeMsg').textContent = 'Keine ÖPNV-Verbindung gefunden.'; return; }
-    $('routeMsg').textContent = `${r.home.name} → ${r.work.name}`;
-    const top = r.suggestions[0];
-    const dir = top.direction.replace(/^Frankfurt \(Main\) /, '');
-    $('routeOut').innerHTML = '<table><tr><th>Linie</th><th>Richtung</th><th>ab</th><th>Fußweg</th><th>Anteil</th></tr>' + r.suggestions.map((s) =>
-      `<tr><td>${esc(s.line)}</td><td>${esc(s.direction)}</td><td>${esc(s.stop)}</td><td>${s.walk_minutes} min</td><td>${s.count}×</td></tr>`).join('') + '</table>'
-      + `<p class="small">Vorschlag für <code>leave:</code> im Profil (Station muss im Profil unter diesem Namen stehen):</p>
-      <pre>leave:\n  line: ${yq(top.line)}\n  direction: ${yq(dir)}\n  stop: ${yq(top.stop.replace(/^Frankfurt \(Main\) /, ''))}\n  ideal: [2, 5]\n  hurry: [0, 2]\n  notify: true</pre>`;
-  } catch (e) { $('routeMsg').className = 'msg err'; $('routeMsg').textContent = e.message; }
+    await post('/api/settings', { night: { enabled: $('nightOn').checked, from: $('nightFrom').value, to: $('nightTo').value, mode: $('nightMode').value } }, 'PUT');
+    $('nightMsg').className = 'msg ok'; $('nightMsg').textContent = 'Gespeichert.'; poll();
+  } catch (e) { $('nightMsg').className = 'msg err'; $('nightMsg').textContent = e.message; }
 });
 
-// ---------------- Config ----------------
-$('loadBtn').addEventListener('click', async () => {
-  $('cfgMsg').className = 'msg';
-  try { $('cfg').value = await api('/api/config', { headers: hdr() }); $('cfgMsg').textContent = 'geladen'; }
-  catch (e) { $('cfgMsg').className = 'msg err'; $('cfgMsg').textContent = e.message; }
-});
-$('saveBtn').addEventListener('click', async () => {
-  $('cfgMsg').className = 'msg';
-  try {
-    const r = await api('/api/config', { method: 'PUT', headers: { ...hdr(), 'Content-Type': 'text/plain' }, body: $('cfg').value });
-    $('cfgMsg').className = 'msg ok'; $('cfgMsg').textContent = `${r.status} (vorherige Fassung in ${r.backup})`; poll();
-  } catch (e) { $('cfgMsg').className = 'msg err'; $('cfgMsg').textContent = e.message; }
-});
+// ================= Technik =================
+async function tech() {
+  if (!document.querySelector('details').open) return;
+  const s = await api('/api/status');
+  $('tech').innerHTML = `<p>Version ${esc(s.version)} · Datenquelle ${esc(s.provider)} · Abruf alle ${Math.round(s.interval_seconds)} s · Push ${s.notify_enabled ? 'an' : 'aus'}</p>
+    <table><tr><th>Station-ID</th><th>Abruf</th><th>Stand</th><th>Abfahrten</th><th>Fehler</th></tr>` +
+    Object.entries(s.stations).map(([id, e]) => `<tr><td><code>${esc(id)}</code></td><td>${e.polling ? 'aktiv' : 'pausiert'}</td>
+      <td>${e.ok ? new Date(e.ok).toLocaleTimeString('de-DE') : '–'}</td><td>${e.departures}</td><td>${esc(e.error || '')}</td></tr>`).join('') + '</table>';
+}
+document.querySelector('details').addEventListener('toggle', tech);
 
-poll(); status();
-setInterval(poll, 15000); setInterval(render, 1000); setInterval(status, 10000);
+poll(); loadTemplates(); loadSettings();
+setInterval(poll, 15000); setInterval(render, 1000); setInterval(loadTemplates, 30000); setInterval(tech, 15000);
 </script>
 </body>
 </html>

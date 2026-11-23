@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from .models import DisplayMode, Product
 
@@ -44,6 +44,24 @@ class TextFilter(BaseModel):
         return not any(self._hit(p, text) for p in self.exclude)
 
 
+class RouteMatch(BaseModel):
+    """Eine Linie in eine Richtung, die zum Ziel führt.
+
+    Abgeglichen wird über Linie + GTFS-``direction_id`` (robust gegen verkürzte Fahrten mit
+    anderem Endziel); fehlt die ID (z. B. RMV), über einen Teil des Zielnamens.
+    """
+
+    line: str
+    direction_id: str | None = None
+    headsign: str | None = None
+
+
+class Place(BaseModel):
+    name: str
+    lat: float
+    lon: float
+
+
 class StopConfig(BaseModel):
     name: str
     ids: dict[str, str | list[str]] = Field(
@@ -54,6 +72,7 @@ class StopConfig(BaseModel):
     products: list[Product] = Field(default_factory=list, description="leer = alle")
     lines: TextFilter = Field(default_factory=TextFilter)
     direction: TextFilter = Field(default_factory=TextFilter)
+    routes: list[RouteMatch] = Field(default_factory=list, description="leer = alle Linien")
     lat: float | None = None
     lon: float | None = None
 
@@ -65,7 +84,7 @@ class StopConfig(BaseModel):
 
 
 class LeaveConfig(BaseModel):
-    line: str
+    line: str | None = Field(None, description="leer = jede Abfahrt der Vorlage")
     direction: str = Field("", description="Substring oder re:...")
     stop: str | None = Field(None, description="Name der Station im Profil; leer = alle")
     ideal: tuple[float, float] = (2, 5)
@@ -79,13 +98,15 @@ class ProfileConfig(BaseModel):
     sort: Literal["time", "line"] = "time"
     max_rows: int = Field(6, ge=1, le=20)
     leave: LeaveConfig | None = None
+    origin: Place | None = None
+    destination: Place | None = None
 
 
 def _parse_hhmm(v: str | time) -> time:
     if isinstance(v, time):
         return v
-    h, m = str(v).split(":")
-    return time(int(h), int(m))
+    parts = str(v).split(":")
+    return time(int(parts[0]), int(parts[1]))
 
 
 class TimeWindow(BaseModel):
@@ -101,6 +122,10 @@ class TimeWindow(BaseModel):
     @classmethod
     def _time(cls, v: str | time) -> time:
         return _parse_hhmm(v)
+
+    @field_serializer("start", "end")
+    def _ser_time(self, v: time) -> str:
+        return v.strftime("%H:%M")
 
     @field_validator("days", mode="before")
     @classmethod
@@ -142,22 +167,11 @@ class PollConfig(BaseModel):
     timeout_seconds: float = 10
 
 
-class HomeConfig(BaseModel):
-    """Nur für den Einrichtungs-Assistenten. Bleibt in der config.yaml auf dem Server."""
-
-    address: str = ""
-    lat: float | None = None
-    lon: float | None = None
-    work_address: str = ""
-    work_lat: float | None = None
-    work_lon: float | None = None
-
-
 class AppConfig(BaseModel):
     provider: Literal["auto", "transitous", "rmv"] = "auto"
     timezone: str = "Europe/Berlin"
-    default_profile: str
-    profiles: dict[str, ProfileConfig]
+    default_profile: str | None = Field(None, description="leer = erste Vorlage")
+    profiles: dict[str, ProfileConfig] = Field(default_factory=dict)
     schedule: list[ScheduleEntry] = Field(default_factory=list)
     night: NightConfig | None = None
     brightness: float = Field(0.8, ge=0, le=1)
@@ -167,17 +181,24 @@ class AppConfig(BaseModel):
         description="Wird von Ziel- und Stationsnamen vorne abgeschnitten",
     )
     poll: PollConfig = Field(default_factory=PollConfig)
-    home: HomeConfig = Field(default_factory=HomeConfig)
+    region: Place = Field(
+        default_factory=lambda: Place(name="Frankfurt am Main", lat=50.1109, lon=8.6821),
+        description="Bevorzugte Gegend für die Adresssuche",
+    )
 
     @model_validator(mode="after")
     def _check_profiles(self) -> AppConfig:
         names = set(self.profiles)
-        if self.default_profile not in names:
+        if self.default_profile is not None and self.default_profile not in names:
             raise ValueError(f"default_profile '{self.default_profile}' ist kein Profil")
         for entry in self.schedule:
             if entry.profile not in names:
                 raise ValueError(f"schedule verweist auf unbekanntes Profil '{entry.profile}'")
         return self
+
+    @property
+    def fallback_profile(self) -> str | None:
+        return self.default_profile or next(iter(self.profiles), None)
 
     def color_for(self, product: Product) -> str:
         return self.colors.get(product.value, DEFAULT_COLORS[product.value])
@@ -192,7 +213,6 @@ class AppConfig(BaseModel):
 class Secrets(BaseModel):
     rmv_api_key: str | None = None
     transitous_contact: str = "https://github.com/K4inx/abfahrtsanzeige"
-    edit_token: str | None = None
     notify_webhook_url: str | None = None
 
     @classmethod
@@ -201,7 +221,6 @@ class Secrets(BaseModel):
             rmv_api_key=os.environ.get("RMV_API_KEY") or None,
             transitous_contact=os.environ.get("TRANSITOUS_CONTACT")
             or cls.model_fields["transitous_contact"].default,
-            edit_token=os.environ.get("EDIT_TOKEN") or None,
             notify_webhook_url=os.environ.get("NOTIFY_WEBHOOK_URL") or None,
         )
 
@@ -214,6 +233,18 @@ def resolve_provider(cfg: AppConfig, secrets: Secrets) -> str:
 
 def load_config(path: Path) -> AppConfig:
     return AppConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+
+
+def save_config(path: Path, cfg: AppConfig) -> None:
+    """Config wird vom Web-UI verwaltet: atomar schreiben, vorherige Fassung als .bak."""
+    data = cfg.model_dump(mode="json", by_alias=True, exclude_none=True, exclude_defaults=False)
+    text = "# Wird vom Web-UI verwaltet. Von Hand ändern geht, Kommentare gehen dabei verloren.\n"
+    text += yaml.safe_dump(data, allow_unicode=True, sort_keys=False)
+    if path.exists():
+        path.with_suffix(".yaml.bak").write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
 
 
 def parse_config_text(text: str) -> AppConfig:

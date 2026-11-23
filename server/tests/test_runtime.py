@@ -191,7 +191,7 @@ def client(cfg_dict, tmp_path):
     cfg_path.write_text(yaml.safe_dump(cfg_dict, allow_unicode=True), encoding="utf-8")
     cfg = AppConfig.model_validate(cfg_dict)
     prov = FakeProvider()
-    sec = Secrets(edit_token="geheim")
+    sec = Secrets()
     rt = Runtime(
         config_path=cfg_path,
         cfg=cfg,
@@ -239,27 +239,105 @@ def test_profile_switch_endpoint(client):
     assert client.post("/api/device/pi/night").json() == {"night": True}
 
 
-def test_config_requires_token(client):
-    assert client.get("/api/config").status_code == 401
-    assert client.get("/api/config", headers={"X-Edit-Token": "falsch"}).status_code == 401
-    text = client.get("/api/config", headers={"X-Edit-Token": "geheim"}).text
-    bad = client.put(
-        "/api/config",
-        content="default_profile: nix\nprofiles: {}\n",
-        headers={"X-Edit-Token": "geheim", "Content-Type": "text/plain"},
-    )
-    assert bad.status_code == 422
-    new = text.replace("Zuhause → Arbeit", "Zur Arbeit")
-    ok = client.put(
-        "/api/config", content=new.encode(), headers={"X-Edit-Token": "geheim", "Content-Type": "text/plain"}
-    )
-    assert ok.status_code == 200
-    assert client.get("/api/board", params={"device": "pi"}).json()["title"] == "Zur Arbeit"
+def _option(**kw):
+    base = {
+        "key": "k",
+        "stop": "Frankfurt (Main) Merianplatz",
+        "stop_ids": ["de-DELFI_de:06412:512"],
+        "walk_minutes": 5,
+        "line": "U4",
+        "product": "U",
+        "direction_id": "1",
+        "headsign": "Frankfurt (Main) Bockenheimer Warte",
+        "travel_minutes": 20,
+        "total_minutes": 25,
+        "transfers": 0,
+        "count": 3,
+    }
+    return base | kw
 
 
-def test_editing_disabled_without_token(client):
-    client.rt.secrets = Secrets()
-    assert client.get("/api/config", headers={"X-Edit-Token": "x"}).status_code == 403
+def test_template_lifecycle(client):
+    body = {
+        "name": "Arbeit",
+        "origin": {"name": "Berger Straße 100", "lat": 50.12, "lon": 8.69},
+        "destination": {"name": "Höchst", "lat": 50.09, "lon": 8.54},
+        "options": [_option(), _option(line="U5", direction_id="0", headsign="Preungesheim")],
+        "schedule": {"days": ["mon", "tue", "wed", "thu", "fri"], "from": "06:00", "to": "10:00"},
+    }
+    assert client.post("/api/templates", json=body).status_code == 200
+    cfg = client.rt.cfg
+    stop = cfg.profiles["Arbeit"].stops[0]
+    assert stop.name == "Merianplatz" and len(stop.routes) == 2  # gleiche Station zusammengefasst
+    assert [e.profile for e in cfg.schedule].count("Arbeit") == 1
+    # Datei geschrieben und wieder ladbar
+    from app.config import load_config
+
+    assert "Arbeit" in load_config(client.rt.config_path).profiles
+
+    data = client.get("/api/templates").json()
+    arbeit = next(t for t in data["templates"] if t["name"] == "Arbeit")
+    assert arbeit["schedule"] == [
+        {"days": ["mon", "tue", "wed", "thu", "fri"], "from": "06:00", "to": "10:00"}
+    ]
+    assert arbeit["stops"][0]["routes"][0] == {"line": "U4", "headsign": "Bockenheimer Warte"}
+    assert client.rt.ui_seen is not None
+
+    # Montag 07:30 → laut Zeitplan „Arbeit"? Der erste passende Eintrag gewinnt: morgens steht vorne.
+    assert client.post("/api/device/pi/profile", json={"profile": "Arbeit"}).status_code == 200
+    b = client.get("/api/board", params={"device": "pi"}).json()
+    assert b["title"] == "Arbeit" and b["rows"][0]["line"] == "U4"
+
+    assert client.delete("/api/templates/Arbeit").status_code == 200
+    assert "Arbeit" not in client.rt.cfg.profiles
+    assert all(e.profile != "Arbeit" for e in client.rt.cfg.schedule)
+    assert client.delete("/api/templates/Arbeit").status_code == 404
+
+
+def test_template_validation(client):
+    bad = {
+        "name": "",
+        "origin": {"name": "a", "lat": 1, "lon": 2},
+        "destination": {"name": "b", "lat": 1, "lon": 2},
+        "options": [],
+    }
+    assert client.post("/api/templates", json=bad).status_code == 422
+
+
+def test_route_filter_uses_direction_id(client):
+    body = {
+        "name": "Nur Bockenheim",
+        "origin": {"name": "a", "lat": 1, "lon": 2},
+        "destination": {"name": "b", "lat": 1, "lon": 2},
+        "options": [_option(direction_id="0")],
+    }
+    client.post("/api/templates", json=body)
+    client.post("/api/device/pi/profile", json={"profile": "Nur Bockenheim"})
+    # FakeProvider-Abfahrt hat keine direction_id → Abgleich über den Zielnamen
+    assert client.get("/api/board", params={"device": "pi"}).json()["rows"]
+    client.rt.poller.cache["de-DELFI_de:06412:512"].departures[0].direction_id = "1"
+    assert client.get("/api/board", params={"device": "pi"}).json()["rows"] == []
+
+
+def test_settings_night(client):
+    assert client.get("/api/settings").json()["night"]["from"] == "23:00"
+    r = client.put(
+        "/api/settings", json={"night": {"enabled": True, "from": "22:30", "to": "05:45", "mode": "off"}}
+    )
+    assert r.status_code == 200
+    n = client.rt.cfg.night
+    assert (n.start.strftime("%H:%M"), n.end.strftime("%H:%M"), n.mode) == ("22:30", "05:45", "off")
+    client.put("/api/settings", json={"night": {"enabled": False}})
+    assert client.rt.cfg.night is None
+
+
+def test_no_templates_board(client):
+    from app.config import AppConfig
+
+    client.rt.cfg = AppConfig()
+    b = client.get("/api/board", params={"device": "pi"}).json()
+    assert b["title"] == "Keine Vorlage" and b["rows"] == []
+    assert client.post("/api/device/pi/profile", json={"step": 1}).json() == {"profile": None}
 
 
 def test_healthz_and_index(client):

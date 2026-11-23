@@ -66,6 +66,7 @@ def parse_stoptimes(data: dict[str, Any]) -> list[Departure]:
                 cancelled=bool(st.get("cancelled") or st.get("tripCancelled")),
                 platform=place.get("track") or place.get("scheduledTrack"),
                 trip_id=st.get("tripId"),
+                direction_id=st.get("directionId"),
                 messages=messages,
             )
         )
@@ -164,10 +165,12 @@ class TransitousProvider:
 
     # --- nur für den Einrichtungs-Assistenten ------------------------------ #
 
-    async def geocode_address(self, text: str) -> list[dict[str, Any]]:
-        return await self._get(
-            "/v1/geocode", {"text": text, "type": "ADDRESS", "numResults": 5, "language": "de"}
-        )
+    async def geocode(self, text: str, near: tuple[float, float] | None = None) -> list[dict[str, Any]]:
+        """Adressen, Orte und Haltestellen — für die Vorschlagsliste beim Tippen."""
+        params: dict[str, Any] = {"text": text, "numResults": 8, "language": "de"}
+        if near:
+            params |= {"place": f"{near[0]},{near[1]}", "placeBias": 5}
+        return await self._get("/v1/geocode", params)
 
     async def nearby_stops(self, lat: float, lon: float, radius_m: int = 800) -> list[NearbyStop]:
         """Stationen im Umkreis (Bounding-Box über /v6/map/stops), nach Namen gruppiert."""
@@ -204,7 +207,21 @@ class TransitousProvider:
             {
                 "fromPlace": f"{from_ll[0]},{from_ll[1]}",
                 "toPlace": f"{to_ll[0]},{to_ll[1]}",
-                "numItineraries": 5,
+                "numItineraries": 8,
+                "searchWindow": 3600,
+                "language": "de",
+            },
+        )
+
+    async def plan_from(self, stop_id: str, to_ll: tuple[float, float]) -> dict[str, Any]:
+        """Verbindungen ab einer Station (``fromPlace`` als Stop-ID), eine Stunde Suchfenster."""
+        return await self._get(
+            "/v6/plan",
+            {
+                "fromPlace": stop_id,
+                "toPlace": f"{to_ll[0]},{to_ll[1]}",
+                "searchWindow": 3600,
+                "numItineraries": 8,
                 "language": "de",
             },
         )

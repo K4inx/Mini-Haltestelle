@@ -67,11 +67,17 @@ Zeiten sind ISO 8601 mit Offset.
 
 | Endpunkt | Zweck |
 |---|---|
-| `GET /api/stations?q=<text>[&provider=transitous\|rmv]` | Stationssuche, um IDs zu finden |
-| `GET /api/status` | Poller-, Geräte- und Provider-Status (für Web-UI und Info-Screen) |
+| `GET /api/places?q=<text>` | Adress-/Ortsvorschläge beim Tippen (Transitous-Geocoder, Gegend aus `region`) |
+| `POST /api/connections` | `{origin, destination}` → Verbindungsoptionen ab den nahen Stationen (Linie, Richtung, Fußweg, Fahrzeit) |
+| `GET /api/templates` | Vorlagen mit Start/Ziel, Stationen, Zeitplan und den nächsten zwei erreichbaren Abfahrten |
+| `POST /api/templates` | `{name, origin, destination, options[], schedule?}` → Vorlage anlegen/überschreiben |
+| `DELETE /api/templates/<name>` | Vorlage löschen |
+| `GET /api/settings` · `PUT /api/settings` | Nachtmodus `{night: {enabled, from, to, mode}}` |
+| `GET /api/stations?q=<text>[&provider=transitous\|rmv]` | Stationssuche nach Namen |
+| `GET /api/status` | Poller- und Provider-Status |
 | `GET /healthz` | Health-Check |
-| `GET /api/config` · `PUT /api/config` | Config lesen/schreiben, Header `X-Edit-Token` |
-| `GET /api/setup/nearby?address=` · `GET /api/setup/route?home=&work=` | Gehzeit-Assistent, Header `X-Edit-Token` |
+
+Das Web-UI hat **keine Anmeldung** — es ist nur fürs Heimnetz gedacht. Port nie öffentlich freigeben.
 
 ## Push-Webhook („Jetzt los")
 

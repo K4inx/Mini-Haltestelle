@@ -1,99 +1,20 @@
-# Abfahrtsanzeige — Server-Konfiguration
-# Kopieren nach config/config.yaml. Wird im Web-UI bearbeitet (Token aus .env).
-# Secrets (RMV-Key, Token, Webhook) gehören in .env, nicht hierher.
+# Wird vom Web-UI verwaltet (Vorlagen, Zeitplan, Nachtmodus).
+# Fehlt die Datei, legt der Server beim Start eine leere an. Kommentare gehen beim
+# Speichern aus dem Web-UI verloren — Aufbau siehe README, Abschnitt Konfiguration.
 
-# auto = rmv, sobald RMV_API_KEY gesetzt ist, sonst transitous
-provider: auto
+provider: auto            # auto = rmv, sobald RMV_API_KEY gesetzt ist, sonst transitous
 timezone: Europe/Berlin
-
-# Profil außerhalb aller Zeitplan-Fenster
-default_profile: abends
-
-profiles:
-  morgens:
-    title: "Zuhause → Arbeit"
-    max_rows: 6
-    sort: time            # time | line (gruppiert nach Linie/Richtung)
-    stops:
-      - name: Merianplatz
-        ids:
-          transitous: "de-DELFI_de:06412:512"
-          # rmv: "<ID aus der Stationssuche, sobald der Key da ist>"
-        walk_minutes: 5
-        products: [U]     # leer = alle: S, U, TRAM, BUS, REGIO, FERN
-        direction:
-          include: ["Bockenheimer"]   # Substring, oder "re:<Regex>"
-      - name: Konstablerwache
-        ids:
-          transitous: "de-DELFI_de:06412:510_G"
-        walk_minutes: 19
-        products: [S]
-        lines:
-          exclude: ["S8", "S9"]       # Linien exakt, oder "re:<Regex>"
-    leave:                # „Jetzt los": LED + optional Push
-      line: U4
-      direction: Bockenheimer
-      stop: Merianplatz
-      ideal: [2, 5]       # Minuten Puffer (Abfahrt − jetzt − Gehzeit)
-      hurry: [0, 2]
-      notify: true        # Webhook (NOTIFY_WEBHOOK_URL), höchstens einmal pro Fahrt
-
-  abends:
-    title: "Merianplatz"
-    stops:
-      - name: Merianplatz
-        ids:
-          transitous: "de-DELFI_de:06412:512"
-        walk_minutes: 5
-
-  wochenende:
-    title: "Wochenende"
-    sort: line
-    stops:
-      - name: Merianplatz
-        ids:
-          transitous: "de-DELFI_de:06412:512"
-        walk_minutes: 5
-      - name: Konstablerwache
-        ids:
-          transitous: "de-DELFI_de:06412:510_G"
-        walk_minutes: 19
-        products: [S, TRAM]
-
-# Automatischer Profilwechsel. Erstes passendes Fenster gewinnt.
-# Manuelle Wahl am Gerät (Taster A/B) gilt bis zum nächsten Wechsel hier.
-schedule:
-  - profile: morgens
-    days: mon-fri
-    from: "06:00"
-    to: "10:00"
-  - profile: wochenende
-    days: [sat, sun]
-    from: "08:00"
-    to: "20:00"
-
-# Nachtmodus: Display gedimmt oder aus, LED aus, kein Push.
-# Bei mode: off pausiert auch der Poller.
+profiles: {}              # Vorlagen, im Web-UI anlegen
+schedule: []
 night:
   days: [mon, tue, wed, thu, fri, sat, sun]
   from: "23:00"
   to: "06:00"
   mode: dim               # dim | off
   brightness: 0.05
-
-brightness: 0.8           # Tag-Helligkeit 0…1
-
-# Badge-Farben überschreiben (Standard: S grün, U blau, TRAM rot, BUS violett, REGIO grau)
-colors: {}
-#  U: "#1c62b0"
-
+brightness: 0.8
 poll:
   interval_seconds: 30    # Minimum 30 (Transitous-Richtlinie)
   departures_per_station: 30
   rmv_daily_budget: 4500  # RMV erlaubt 5000/Tag
   timeout_seconds: 10
-
-# Nur für den Gehzeit-Assistenten; bleibt auf dem Server.
-home:
-  address: ""
-  work_address: ""

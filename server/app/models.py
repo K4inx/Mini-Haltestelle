@@ -38,6 +38,7 @@ class Departure(BaseModel):
     cancelled: bool = False
     platform: str | None = None
     trip_id: str | None = None
+    direction_id: str | None = None
     messages: list[str] = Field(default_factory=list)
 
     @property

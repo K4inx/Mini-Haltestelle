@@ -38,10 +38,12 @@ brauchen kein Update am Gerät.
 - **Poller mit Cache**: Nur der Poller fragt die Datenquelle ab, höchstens alle 30 s pro
   Station und nur für aktive Geräte. Bei RMV hält er ein Tagesbudget ein. Bei Fehlern wartet
   er mit Backoff und liefert die letzten Daten mit `stale: true` aus.
-- **Web-UI** (`/`): Live-Vorschau im Format 320×240 mit virtuellen Tastern, Config-Editor,
-  Stationssuche, Status. Dazu ein **Gehzeit-Assistent**: Er sucht zu einer Adresse die nahen
-  Stationen und berechnet den Fußweg über OpenStreetMap. Für Wohnung → Arbeit schlägt er eine
-  „Jetzt los"-Linie vor.
+- **Web-UI** (`/`), ganz ohne Config-Datei: Start und Ziel eintippen (mit Vorschlagsliste),
+  „Verbindung suchen" zeigt die Haltestellen in der Nähe mit Fußweg und den Linien, die zum Ziel
+  führen. Ankreuzen, Namen vergeben, optional „automatisch Mo–Fr 6–10 Uhr" → **Vorlage**.
+  Die Übersicht zeigt pro Vorlage Start → Ziel und die nächsten zwei Abfahrten, die du noch
+  schaffst. Dazu Live-Vorschau des Displays (320×240) mit virtuellen Tastern und Nachtmodus.
+  Kein Login: nur fürs Heimnetz.
 
 ## Quickstart
 
@@ -49,10 +51,9 @@ brauchen kein Update am Gerät.
 
 ```bash
 cd server
-cp .env.example .env                              # EDIT_TOKEN setzen, ggf. RMV_API_KEY
-cp config/config.example.yaml config/config.yaml  # Stationen anpassen (oder per Web-UI)
-docker compose up -d --build
-# → http://<host>:8080
+cp .env.example .env          # ggf. RMV_API_KEY, NOTIFY_WEBHOOK_URL
+docker compose up -d --build  # legt config/config.yaml leer an
+# → http://<host>:8080, dort die erste Vorlage anlegen
 ```
 
 ### Server (Entwicklung)
@@ -60,8 +61,7 @@ docker compose up -d --build
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e 'server[dev]'
 cd server
-cp config/config.example.yaml config/config.yaml
-CONFIG_PATH=config/config.yaml EDIT_TOKEN=dev ../.venv/bin/uvicorn app.main:app --reload --port 8080
+CONFIG_PATH=config/config.yaml ../.venv/bin/uvicorn app.main:app --reload --port 8080
 ../.venv/bin/pytest          # Tests, ohne echte API-Aufrufe
 ../.venv/bin/ruff check . && ../.venv/bin/ruff format --check .
 ```
@@ -72,32 +72,33 @@ Kommt mit Phase 2.
 
 ## Konfiguration
 
-`server/config/config.yaml` ist ausführlich kommentiert, siehe
-[`config.example.yaml`](server/config/config.example.yaml). Kurzreferenz:
+Normalerweise reicht das Web-UI. Es schreibt `server/config/config.yaml`, die vorherige Fassung
+bleibt als `config.yaml.bak` liegen. Von Hand ändern geht auch. Kurzreferenz:
 
 | Schlüssel | Bedeutung |
 |---|---|
 | `provider` | `auto` · `transitous` · `rmv` |
 | `default_profile` | Profil außerhalb aller Zeitplan-Fenster |
-| `profiles.<name>.title` | Kopfzeile auf dem Display |
-| `profiles.<name>.stops[]` | `name`, `ids.{transitous,rmv}` (String oder Liste), `walk_minutes`, `products`, `lines.include/exclude`, `direction.include/exclude` |
+| `profiles.<name>` | eine **Vorlage**: `title` (Kopfzeile), `origin`/`destination` (nur zur Anzeige) |
+| `profiles.<name>.stops[]` | `name`, `ids.{transitous,rmv}` (String oder Liste), `walk_minutes`, `routes[]` (`line` + `direction_id`, sonst `headsign`), optional `products`, `lines`, `direction` |
 | `profiles.<name>.sort` | `time` (Standard) oder `line` (gruppiert nach Linie/Richtung) |
 | `profiles.<name>.max_rows` | Standard 6 |
-| `profiles.<name>.leave` | `line`, `direction`, `stop`, `ideal: [2, 5]`, `hurry: [0, 2]`, `notify` |
+| `profiles.<name>.leave` | `ideal: [2, 5]`, `hurry: [0, 2]`, `notify`; optional `line`/`direction`/`stop`, sonst zählt jede Abfahrt der Vorlage |
 | `schedule[]` | `profile`, `days` (`mon-fri` oder Liste), `from`, `to` (über Mitternacht erlaubt) |
 | `night` | `days`, `from`, `to`, `mode: dim\|off`, `brightness` |
 | `brightness`, `colors` | Tag-Helligkeit, Badge-Farben pro Verkehrsmittel |
+| `region` | Gegend, die die Adresssuche bevorzugt (Standard Frankfurt) |
 | `poll` | `interval_seconds` (≥ 30), `departures_per_station`, `rmv_daily_budget`, `timeout_seconds` |
 
 Secrets und Schalter in `server/.env` (siehe [`.env.example`](server/.env.example)):
-`RMV_API_KEY`, `TRANSITOUS_CONTACT`, `EDIT_TOKEN`, `NOTIFY_WEBHOOK_URL`.
+`RMV_API_KEY`, `TRANSITOUS_CONTACT`, `NOTIFY_WEBHOOK_URL`.
 
 ### Station-IDs finden
 
-Im Web-UI unter **Stationssuche**, oder `GET /api/stations?q=Merianplatz&provider=transitous`.
-Die IDs unterscheiden sich je Provider. Deshalb stehen sie pro Provider in `ids:`.
-Transitous liefert für manche Stationen nur Bahnsteig-IDs ohne gemeinsame Eltern-ID.
-Dann trägt man eine Liste ein, und der Assistent macht das automatisch.
+Macht das Web-UI beim Anlegen einer Vorlage. Von Hand: `GET /api/stations?q=Merianplatz&provider=transitous`.
+Die IDs unterscheiden sich je Provider, deshalb stehen sie pro Provider in `ids:`.
+Transitous liefert für manche Stationen nur Bahnsteig-IDs ohne gemeinsame Eltern-ID —
+dann steht dort eine Liste.
 
 ## Datenquellen und Nutzungsbedingungen
 

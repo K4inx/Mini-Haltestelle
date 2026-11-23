@@ -8,7 +8,7 @@ from app.models import Product
 from app.providers import ProviderError, RmvProvider, TransitousProvider
 from app.providers.rmv import parse_departure_board, parse_location_name
 from app.providers.transitous import BASE_URL, group_map_stops, parse_geocode, parse_stoptimes
-from app.setup_assistant import summarize_plan, walk_minutes
+from app.setup_assistant import merge_options, options_from_plan, parse_places, walk_minutes
 
 from .conftest import load, utc
 
@@ -61,13 +61,66 @@ def test_group_map_stops_uses_parent_or_platform_ids():
     assert len(groups["Frankfurt (Main) Waldschmidtstraße"].ids) == 2
 
 
-def test_summarize_plan():
-    sug = summarize_plan(load("transitous/plan.json"))
-    top = sug[0]
+def test_options_from_address_plan():
+    opts = options_from_plan(load("transitous/plan.json"))
+    top = opts[0]
     assert (top.line, top.stop, top.product) == ("U4", "Frankfurt (Main) Höhenstraße", Product.U)
-    assert top.direction == "Frankfurt (Main) Bockenheimer Warte"
+    assert top.headsign == "Frankfurt (Main) Bockenheimer Warte"
+    assert top.direction_id == "1"
     assert top.walk_minutes == 5  # 240 s → 4 min + 1 min Puffer
-    assert top.count >= 3
+    assert top.stop_ids == ["de-DELFI_de:06412:502"]  # Eltern-ID statt Bahnsteig
+
+
+def test_options_from_station_plan_skip_walks_to_other_stations():
+    plan = load("transitous/plan_from_stop.json")
+    station = "Frankfurt (Main) Waldschmidtstraße"
+    opts = options_from_plan(plan, station=station, station_ids=["a", "b"], walk=11)
+    assert opts, "mindestens eine Verbindung ab der Station selbst"
+    assert all(o.stop == station and o.walk_minutes == 11 and o.stop_ids == ["a", "b"] for o in opts)
+    assert "14" in {o.line for o in opts}
+    assert "U4" not in {o.line for o in opts}  # U4 hieße erst zum Merianplatz laufen
+
+
+def test_merge_options():
+    plan = load("transitous/plan.json")
+    merged = merge_options(options_from_plan(plan))
+    assert len(merged) == 1 and merged[0].count == len(plan["itineraries"])
+
+
+def test_parse_places_labels():
+    data = [
+        {
+            "type": "PLACE",
+            "name": "Höchst",
+            "zip": "64739",
+            "lat": 1,
+            "lon": 2,
+            "areas": [{"name": "Höchst i. Odw.", "default": True}],
+        },
+        {
+            "type": "ADDRESS",
+            "name": "Berger Straße 100",
+            "street": "Berger Straße",
+            "houseNumber": "100",
+            "zip": "60316",
+            "lat": 3,
+            "lon": 4,
+            "areas": [{"name": "Frankfurt am Main", "default": True}],
+        },
+        {
+            "type": "STOP",
+            "name": "Frankfurt (Main) Merianplatz",
+            "lat": 5,
+            "lon": 6,
+            "areas": [{"name": "Frankfurt am Main", "default": True}],
+        },
+    ]
+    labels = [p.label for p in parse_places(data)]
+    assert labels == [
+        "Höchst, 64739 Höchst i. Odw.",
+        "Berger Straße 100, 60316 Frankfurt am Main",
+        "Frankfurt (Main) Merianplatz, Frankfurt am Main",
+    ]
 
 
 def test_walk_minutes_rounding():

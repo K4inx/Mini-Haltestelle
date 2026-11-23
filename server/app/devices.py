@@ -60,7 +60,7 @@ class DeviceStore:
 
     # ------------------------------------------------------------------ #
 
-    def profile(self, cfg: AppConfig, device: str, now: datetime) -> str:
+    def profile(self, cfg: AppConfig, device: str, now: datetime) -> str | None:
         st = self.get(device)
         if st.profile in cfg.profiles and st.profile_until and now < st.profile_until:
             return st.profile
@@ -74,10 +74,12 @@ class DeviceStore:
         st.profile_until = board.next_change(lambda t: board.scheduled_profile(cfg, t), now)
         self.save()
 
-    def step_profile(self, cfg: AppConfig, device: str, step: int, now: datetime) -> str:
+    def step_profile(self, cfg: AppConfig, device: str, step: int, now: datetime) -> str | None:
         names = list(cfg.profiles)
+        if not names:
+            return None
         cur = self.profile(cfg, device, now)
-        new = names[(names.index(cur) + step) % len(names)]
+        new = names[(names.index(cur) + step) % len(names)] if cur in names else names[0]
         self.set_profile(cfg, device, new, now)
         return new
 
