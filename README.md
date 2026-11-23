@@ -56,6 +56,8 @@ docker compose up -d --build  # legt config/config.yaml leer an
 # → http://<host>:8080, dort die erste Vorlage anlegen
 ```
 
+Update später: `server/update.sh` (holt `git pull`, baut neu, räumt alte Images weg).
+
 ### Server (Entwicklung)
 
 ```bash

@@ -4,8 +4,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
-server/config/config.yaml
-server/config/config.yaml.bak
+server/config/config.yaml*
 server/data/
 client/out/
 case/stl/
