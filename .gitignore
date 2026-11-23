@@ -9,3 +9,4 @@ server/config/config.yaml.bak
 server/data/
 client/out/
 case/stl/
+*.egg-info/
