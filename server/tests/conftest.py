@@ -26,6 +26,7 @@ def local(s: str) -> datetime:
 @pytest.fixture
 def cfg_dict() -> dict:
     return {
+        "buffer_minutes": 0,  # alte Tests rechnen ohne Puffer; eigene Tests dafür in test_board.py
         "default_profile": "abends",
         "profiles": {
             "morgens": {

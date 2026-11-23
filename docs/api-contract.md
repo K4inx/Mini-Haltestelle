@@ -54,12 +54,14 @@ Server auf. Der Client zeigt nur an.
 | `rows[].departure` | Beste bekannte Abfahrt (Echtzeit vor Soll). **Der Client zählt den Countdown selbst** aus diesem Feld herunter. |
 | `rows[].planned`, `delay_min` | Soll-Zeit und Verspätung in Minuten (gerundet, kann negativ sein). |
 | `rows[].cancelled` | Fällt aus → durchgestrichen. |
-| `rows[].reachable` | Immer `true`: Nicht erreichbare Abfahrten (Abfahrt − jetzt < Gehzeit) entfernt der Server. |
+| `rows[].reachable` | Immer `true`: Abfahrten, die du mit Fußweg **und Puffer** nicht mehr schaffst, entfernt der Server. |
 | `rows[].product` | `S` · `U` · `TRAM` · `BUS` · `REGIO` · `FERN` · `OTHER` |
 | `rows[].color` | Badge-Farbe `#rrggbb` aus der Config (Standard oder überschrieben). |
 | `messages` | Störungs-/Hinweistexte, dedupliziert → Lauftext. |
 | `source` | Datenquelle für die Quellenangabe (`Transitous` oder `RMV`). Rechts klein in der Fußzeile. |
-| `rows[].walk_minutes` | Fußweg zur Station → „Losgehen spätestens“ in der Detail-Ansicht. |
+| `rows[].walk_minutes` | Fußweg zur Station. |
+| `rows[].leave_at` | Spätestens losgehen = Abfahrt − Fußweg − Puffer (`buffer_minutes`, Standard 2) → Detail-Ansicht. |
+| `rows[].realtime` | `false` = nur Fahrplanzeit, keine Live-Daten → Client zeigt `~` vor der Zeit. |
 | `rows[].arrival`, `transfers` | Geschätzte Ankunft am Ziel (Abfahrt + Fahrzeit aus der Verbindungssuche) und Umstiege. Fehlt bei Vorlagen ohne diese Angabe. |
 | `rows[].key` | Kennung der Fahrt. |
 | `destination` | Ziel der Vorlage, für „Ankunft Höchst ca. 08:42“. |

@@ -160,6 +160,7 @@ class NightIn(BaseModel):
 
 class SettingsIn(BaseModel):
     night: NightIn
+    buffer_minutes: float = Field(2, ge=0, le=15)
 
 
 def _no_template_board(rt: Runtime, now: datetime) -> Board:
@@ -361,12 +362,13 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
     async def get_settings(rt: RT) -> dict[str, Any]:
         n = rt.cfg.night
         return {
+            "buffer_minutes": rt.cfg.buffer_minutes,
             "night": {
                 "enabled": n is not None,
                 "from": n.start.strftime("%H:%M") if n else "23:00",
                 "to": n.end.strftime("%H:%M") if n else "06:00",
                 "mode": n.mode if n else "dim",
-            }
+            },
         }
 
     @app.put("/api/settings")
@@ -381,6 +383,7 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
                 raise HTTPException(422, f"Uhrzeit ungültig: {e}") from e
         else:
             cfg.night = None
+        cfg.buffer_minutes = body.buffer_minutes
         rt.save(cfg)
         return {"status": "gespeichert"}
 

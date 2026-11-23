@@ -213,3 +213,41 @@ def test_next_change(cfg_dict):
     cfg = AppConfig.model_validate(cfg_dict)
     t = board.next_change(lambda x: board.is_night(cfg, x), local("2026-11-23T20:15"))
     assert t == local("2026-11-23T23:00")
+
+
+# ---------------------------------------------------------------- Puffer --- #
+
+
+def test_buffer_hides_too_tight_departures(cfg_dict):
+    cfg_dict["buffer_minutes"] = 2
+    cfg = AppConfig.model_validate(cfg_dict)
+    # Fußweg 5 + Puffer 2 = 7 min nötig
+    deps = [dep(now=NOW, minutes=m, trip=str(m)) for m in (6, 7, 9)]
+    b, _ = board.build_board(
+        cfg, "morgens", {"Merianplatz": deps}, NOW, night=False, stale_since=None, source="x"
+    )
+    assert [r.key for r in b.rows] == ["7", "9"]
+    assert b.rows[0].leave_at == NOW  # Abfahrt in 7 min − 5 Fußweg − 2 Puffer = jetzt
+
+
+def test_buffer_shifts_reminder_signal(cfg_dict):
+    cfg_dict["buffer_minutes"] = 2
+    cfg = AppConfig.model_validate(cfg_dict)
+    d = dep(now=NOW, minutes=10, trip="T")  # Spielraum 10 − 5 − 2 = 3 → ideal
+    b, _ = board.build_board(
+        cfg, "morgens", {"Merianplatz": [d]}, NOW, night=False, stale_since=None, source="x", reminder_key="T"
+    )
+    assert b.reminder.signal == LeaveSignal.IDEAL
+    assert b.reminder.leave_at == NOW + timedelta(minutes=3)
+
+
+def test_realtime_flag():
+    cfg = AppConfig.model_validate(
+        {"profiles": {"p": {"title": "t", "stops": [STOP.model_dump()]}}, "buffer_minutes": 0}
+    )
+    plan_only = dep(now=NOW, minutes=10, trip="a")
+    live = dep(now=NOW, minutes=12, trip="b", delay=1)
+    b, _ = board.build_board(
+        cfg, "p", {"Merianplatz": [plan_only, live]}, NOW, night=False, stale_since=None, source="x"
+    )
+    assert [r.realtime for r in b.rows] == [False, True]

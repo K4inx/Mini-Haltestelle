@@ -68,9 +68,15 @@ def next_change(fn: Callable[[datetime], object], now: datetime, horizon_h: int 
 # --------------------------------------------------------------------------- #
 
 
-def slack_minutes(dep: Departure, stop: StopConfig, now: datetime) -> float:
-    """Puffer in Minuten: Zeit bis zur Abfahrt minus Gehzeit. < 0 = nicht mehr zu schaffen."""
-    return (dep.departure - now).total_seconds() / 60 - stop.walk_minutes
+def slack_minutes(dep: Departure, stop: StopConfig, now: datetime, buffer: float = 0) -> float:
+    """Spielraum in Minuten: Zeit bis zur Abfahrt minus Gehzeit minus Sicherheitspuffer.
+    < 0 = nicht mehr (mit Puffer) zu schaffen."""
+    return (dep.departure - now).total_seconds() / 60 - stop.walk_minutes - buffer
+
+
+def leave_at(dep: Departure, stop: StopConfig, buffer: float = 0) -> datetime:
+    """Spätestens losgehen, damit man ``buffer`` Minuten vor Abfahrt an der Station ist."""
+    return dep.departure - timedelta(minutes=stop.walk_minutes + buffer)
 
 
 def passes_filters(dep: Departure, stop: StopConfig) -> bool:
@@ -107,7 +113,7 @@ def _line_ok(f: TextFilter, line: str) -> bool:
 
 
 def collect(
-    profile: ProfileConfig, deps_by_stop: dict[str, list[Departure]], now: datetime
+    profile: ProfileConfig, deps_by_stop: dict[str, list[Departure]], now: datetime, buffer: float = 0
 ) -> list[tuple[Departure, StopConfig]]:
     """Virtual Stop: alle Stationen des Profils filtern, unerreichbare entfernen, zusammenführen.
 
@@ -124,7 +130,7 @@ def collect(
             seen.add(k)
             if not passes_filters(dep, stop):
                 continue
-            if slack_minutes(dep, stop, now) < 0:
+            if slack_minutes(dep, stop, now, buffer) < 0:
                 continue
             out.append((dep, stop))
     return out
@@ -160,14 +166,17 @@ def leave_candidates(
 
 
 def leave_signal(
-    leave: LeaveConfig | None, items: Iterable[tuple[Departure, StopConfig]], now: datetime
+    leave: LeaveConfig | None,
+    items: Iterable[tuple[Departure, StopConfig]],
+    now: datetime,
+    buffer: float = 0,
 ) -> tuple[LeaveSignal, tuple[Departure, StopConfig] | None]:
     """Ideal schlägt knapp: Wenn eine passende Fahrt im Ideal-Fenster liegt, gilt ``ideal``."""
     if leave is None:
         return LeaveSignal.NONE, None
     hurry: tuple[Departure, StopConfig] | None = None
     for dep, stop in sorted(leave_candidates(leave, items), key=lambda x: x[0].departure):
-        slack = slack_minutes(dep, stop, now)
+        slack = slack_minutes(dep, stop, now, buffer)
         if leave.ideal[0] <= slack <= leave.ideal[1]:
             return LeaveSignal.IDEAL, (dep, stop)
         if hurry is None and leave.hurry[0] <= slack < leave.hurry[1]:
@@ -206,11 +215,12 @@ def build_board(
     mehr erreichbar, fehlt ``board.reminder`` — der Aufrufer löscht die Erinnerung dann.
     """
     profile = cfg.profiles[profile_name]
-    items = collect(profile, deps_by_stop, now)
+    buf = cfg.buffer_minutes
+    items = collect(profile, deps_by_stop, now, buf)
     reminder: Reminder | None = None
     if reminder_key is not None:
         hit = [(d, s) for d, s in items if d.key == reminder_key and not d.cancelled]
-        signal, trigger = leave_signal(LeaveConfig(), hit, now)
+        signal, trigger = leave_signal(LeaveConfig(), hit, now, buf)
         if hit:
             d, s = hit[0]
             reminder = Reminder(
@@ -218,11 +228,11 @@ def build_board(
                 direction=cfg.strip(d.direction),
                 stop=cfg.strip(d.stop or s.name),
                 departure=d.departure.astimezone(now.tzinfo),
-                leave_at=(d.departure - timedelta(minutes=s.walk_minutes)).astimezone(now.tzinfo),
+                leave_at=leave_at(d, s, buf).astimezone(now.tzinfo),
                 signal=signal,
             )
     else:
-        signal, trigger = leave_signal(profile.leave, items, now)
+        signal, trigger = leave_signal(profile.leave, items, now, buf)
     if night:
         signal, trigger = LeaveSignal.NONE, None
         if reminder:
@@ -242,6 +252,8 @@ def build_board(
             platform=d.platform,
             color=cfg.color_for(d.product),
             walk_minutes=s.walk_minutes,
+            leave_at=leave_at(d, s, buf).astimezone(now.tzinfo),
+            realtime=d.realtime is not None,
             arrival=_arrival(d, s, now),
             transfers=_route(d, s).transfers if _route(d, s) else None,
             key=d.key,

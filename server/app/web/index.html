@@ -178,7 +178,12 @@
     </section>
 
     <section aria-labelledby="h-night">
-      <h2 id="h-night">Nachtmodus</h2>
+      <h2 id="h-night">Einstellungen</h2>
+      <div class="row" style="margin-bottom:6px">
+        <div style="flex:0 1 140px"><label for="buffer">Puffer (Minuten)</label><input type="number" id="buffer" min="0" max="15" step="1" value="2"></div>
+      </div>
+      <p class="small" style="margin-top:0">So viele Minuten willst du vor Abfahrt an der Haltestelle sein. Knappere Bahnen werden ausgeblendet, die Erinnerung meldet sich entsprechend früher.</p>
+      <h2 style="margin-top:16px;font-size:15px">Nachtmodus</h2>
       <p class="lead">In dieser Zeit wird das Display dunkel und die LED bleibt aus.</p>
       <label class="check"><input type="checkbox" id="nightOn"> Nachtmodus verwenden</label>
       <div class="row">
@@ -186,7 +191,7 @@
         <div><label for="nightTo">bis</label><input type="time" id="nightTo" value="06:00"></div>
         <div><label for="nightMode">Display</label><select id="nightMode"><option value="dim">gedimmt</option><option value="off">aus</option></select></div>
       </div>
-      <div class="row" style="margin-top:10px"><button id="nightSave">Speichern</button></div>
+      <div class="row" style="margin-top:12px"><button id="nightSave" class="primary">Einstellungen speichern</button></div>
       <div class="msg" id="nightMsg" role="status"></div>
     </section>
   </div>
@@ -244,7 +249,7 @@
 
   <section class="wide" aria-labelledby="h-tpl">
     <h2 id="h-tpl">Vorlagen</h2>
-    <p class="lead">Welche Verbindung wohin führt und wann die nächsten zwei Bahnen fahren, die du noch schaffst.</p>
+    <p class="lead">Welche Verbindung wohin führt und wann die nächsten zwei Bahnen fahren, die du mit Puffer noch schaffst. <span class="small">~ = nur Fahrplan, keine Live-Daten</span></p>
     <div class="tpls" id="tpls"><div class="empty-state">lädt …</div></div>
     <details style="margin-top:16px"><summary>Technik</summary><div id="tech" class="small"></div></details>
   </section>
@@ -393,7 +398,7 @@ async function loadTemplates() {
         const late = r.delay_min > 0 ? ` <span class="late">+${r.delay_min}</span>` : '';
         return `<div class="next-row"><span class="lbadge" style="background:${esc(r.color)}">${esc(r.line)}</span>
           <span class="dir">${esc(r.direction)} <small class="small">ab ${esc(r.stop)}</small></span>
-          <span class="t">${hhmm(r.departure)}${late} <small>in ${m} min</small></span></div>`;
+          <span class="t">${r.realtime ? '' : '~'}${hhmm(r.departure)}${late} <small>in ${m} min</small></span></div>`;
       }).join('') : `<div class="small">${t.stale ? 'Daten gerade nicht abrufbar' : 'keine Abfahrt mehr, die du schaffst'}</div>`;
       const from = t.origin ? esc(strip(t.origin.name)) : '?', to = t.destination ? esc(strip(t.destination.name)) : '?';
       return `<article class="tpl">
@@ -455,20 +460,21 @@ function renderBody() {            // bei neuen Daten oder Ansichtswechsel
     if (!r) { setHTML(body, '<div class="scr-empty">keine Abfahrt, die du noch schaffst</div>'); return; }
     const plat = r.platform ? ` · Gleis ${esc(r.platform)}` : '';
     const delay = r.delay_min > 0 ? ` <span class="${lateCls(r.delay_min)}">+${r.delay_min}</span>` : '';
-    const leave = new Date(new Date(r.departure) - r.walk_minutes * 60000).toISOString();
+    const leave = r.leave_at || new Date(new Date(r.departure) - r.walk_minutes * 60000).toISOString();
     const arr = r.arrival ? `<div class="det-line"><em>Ankunft${board.destination ? ' ' + esc(board.destination) : ''}</em> ca. ${hhmm(r.arrival)}${r.transfers != null ? ` <em>· ${r.transfers ? r.transfers + '× umsteigen' : 'direkt'}</em>` : ''}</div>` : '';
     setHTML(body, `<div class="det">
       <div class="det-top"><span class="badge" style="background:${esc(r.color)}">${esc(r.line)}</span><span>${esc(r.direction)}</span></div>
       <div class="det-sub">ab ${esc(r.stop)}${plat}</div>
-      <div class="det-big"><b data-dep="${esc(r.departure)}" class="m"></b><span>${hhmm(r.departure)}${delay}</span></div>
-      <div class="det-line"><em>Losgehen spätestens</em> ${hhmm(leave)} <em>(${Math.round(r.walk_minutes)} min Fußweg)</em></div>
+      <div class="det-big"><b data-dep="${esc(r.departure)}" class="m"></b><span>${r.realtime ? '' : '~'}${hhmm(r.departure)}${delay}</span></div>
+      <div class="det-line"><em>Losgehen spätestens</em> ${hhmm(leave)} <em>(${Math.round(r.walk_minutes)} min Fußweg + Puffer)</em></div>
+      ${r.realtime ? '' : '<div class="det-sub">~ nur Fahrplan, keine Live-Daten</div>'}
       ${arr}</div>`);
     return;
   }
   const remDep = board.reminder?.departure, remLine = board.reminder?.line;
   const rows = board.rows.map((r) => `<div class="scr-row${r.cancelled ? ' x' : ''}${r.departure === remDep && r.line === remLine ? ' rem' : ''}">
       <span class="badge" style="background:${esc(r.color)}">${esc(r.line)}</span><span class="d">${esc(r.direction)}</span>
-      <span class="m ${lateCls(r.delay_min)}" ${r.cancelled ? '' : `data-dep="${esc(r.departure)}"`}>${r.cancelled ? 'fällt aus' : ''}</span></div>`).join('');
+      <span class="m ${lateCls(r.delay_min)}" ${r.cancelled ? '' : `data-dep="${esc(r.departure)}" data-rt="${r.realtime ? 1 : 0}"`}>${r.cancelled ? 'fällt aus' : ''}</span></div>`).join('');
   setHTML(body, rows || `<div class="scr-empty">${board.profile ? 'keine Abfahrt, die du noch schaffst' : 'keine Vorlage'}</div>`);
 }
 
@@ -500,7 +506,7 @@ function tick() {                  // jede Sekunde: nur Uhr, Minuten, Hinweise, 
   scr.querySelectorAll('[data-dep]').forEach((el) => {
     const t = el.classList.contains('m') && el.tagName === 'B'
       ? (minsTo(el.dataset.dep, now) <= 0 ? 'jetzt' : 'in ' + minsTo(el.dataset.dep, now) + ' min')
-      : minutesLabel(el.dataset.dep, now);
+      : (el.dataset.rt === '0' ? '~' : '') + minutesLabel(el.dataset.dep, now);
     setText(el, t);
   });
   const off = $('sOff');
@@ -560,11 +566,13 @@ async function after() { await poll(); loadTemplates(); }
 // ================= Nachtmodus =================
 async function loadSettings() {
   const s = await api('/api/settings');
+  $('buffer').value = s.buffer_minutes;
   $('nightOn').checked = s.night.enabled; $('nightFrom').value = s.night.from; $('nightTo').value = s.night.to; $('nightMode').value = s.night.mode;
 }
 $('nightSave').addEventListener('click', async () => {
   try {
-    await post('/api/settings', { night: { enabled: $('nightOn').checked, from: $('nightFrom').value, to: $('nightTo').value, mode: $('nightMode').value } }, 'PUT');
+    await post('/api/settings', { buffer_minutes: Number($('buffer').value || 0), night: { enabled: $('nightOn').checked, from: $('nightFrom').value, to: $('nightTo').value, mode: $('nightMode').value } }, 'PUT');
+    loadTemplates();
     $('nightMsg').className = 'msg ok'; $('nightMsg').textContent = 'Gespeichert.'; poll();
   } catch (e) { $('nightMsg').className = 'msg err'; $('nightMsg').textContent = e.message; }
 });

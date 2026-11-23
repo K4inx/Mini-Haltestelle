@@ -177,6 +177,9 @@ class AppConfig(BaseModel):
     schedule: list[ScheduleEntry] = Field(default_factory=list)
     night: NightConfig | None = None
     brightness: float = Field(0.8, ge=0, le=1)
+    buffer_minutes: float = Field(
+        2, ge=0, le=15, description="Sicherheitspuffer: so viele Minuten vor Abfahrt an der Station sein"
+    )
     colors: dict[str, str] = Field(default_factory=dict, description="überschreibt Badge-Farben")
     strip_prefixes: list[str] = Field(
         default_factory=lambda: ["Frankfurt (Main) ", "Frankfurt (Main)-", "Frankfurt am Main, "],

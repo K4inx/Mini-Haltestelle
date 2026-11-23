@@ -104,6 +104,8 @@ class BoardRow(BaseModel):
     platform: str | None = None
     color: str | None = Field(None, description="Badge-Farbe als #rrggbb (aus der Config)")
     walk_minutes: float = Field(0, description="Fußweg zur Station")
+    leave_at: datetime | None = Field(None, description="Spätestens losgehen (Abfahrt − Fußweg − Puffer)")
+    realtime: bool = Field(False, description="Zeit kommt aus Echtzeitdaten (sonst nur Fahrplan)")
     arrival: datetime | None = Field(None, description="Geschätzte Ankunft am Ziel der Vorlage")
     transfers: int | None = Field(None, description="Umstiege bis zum Ziel (aus der Verbindungssuche)")
     key: str = Field("", description="Kennung der Fahrt (z. B. für die Erinnerung)")
@@ -116,7 +118,7 @@ class Reminder(BaseModel):
     direction: str
     stop: str
     departure: datetime
-    leave_at: datetime = Field(description="Spätestens losgehen (Abfahrt − Fußweg)")
+    leave_at: datetime = Field(description="Spätestens losgehen (Abfahrt − Fußweg − Puffer)")
     signal: LeaveSignal
 
 
