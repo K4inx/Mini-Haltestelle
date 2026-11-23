@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini-Haltestelle</title>
+<style>
+  :root {
+    --bg: #f4f5f2; --card: #ffffff; --ink: #1d2320; --muted: #66706a; --line: #dde1dc;
+    --accent: #1f7a45; --accent-ink: #ffffff; --warn: #b85c00; --err: #b3261e;
+    --dfi-bg: #0b0d10; --dfi-ink: #f4d35e; --dfi-muted: #8b96a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121513; --card: #1b1f1c; --ink: #e7ebe7; --muted: #9aa49d; --line: #2d332f;
+            --accent: #4bb377; --accent-ink: #08130c; --warn: #f0a050; --err: #f2867d; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .h-sign { width: 24px; height: 24px; border-radius: 50%; background: #1f8a3c; color: #f6d200;
+            display: inline-grid; place-items: center; font-weight: 800; font-size: 15px; }
+  header .meta { color: var(--muted); font-size: 13px; margin-left: auto; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; display: grid; gap: 18px;
+         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input, select, textarea, button { font: inherit; color: inherit; }
+  input, select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+  textarea { font: 13px/1.5 ui-monospace, "Cascadia Code", Menlo, monospace; min-height: 420px; resize: vertical; }
+  button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+  .row > * { flex: 1 1 140px; }
+  .row > button { flex: 0 0 auto; }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 1.2em; }
+  .msg.err { color: var(--err); } .msg.ok { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  td code, pre { font: 12px ui-monospace, Menlo, monospace; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; overflow-x: auto; margin: 8px 0 0; }
+  .small { font-size: 12px; color: var(--muted); }
+
+  /* ---------- Display-Vorschau 320×240 ---------- */
+  .preview-wrap { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .bezel { background: #222; padding: 14px; border-radius: 10px; display: inline-flex; gap: 10px; align-items: center; }
+  .btncol { display: flex; flex-direction: column; gap: 46px; }
+  .hwbtn { width: 30px; height: 30px; border-radius: 50%; border: 0; background: #444; color: #ddd; font-weight: 700; font-size: 12px; padding: 0; }
+  .hwbtn:active { background: #666; }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: #333; margin: 0 auto; }
+  .screen-scale { width: 320px; height: 240px; overflow: hidden; }
+  @media (min-width: 900px) { .screen-scale.x2 { width: 480px; height: 360px; } .screen-scale.x2 .screen { transform: scale(1.5); } }
+  .screen { width: 320px; height: 240px; transform-origin: 0 0; background: var(--dfi-bg); color: var(--dfi-ink);
+            font-family: "DejaVu Sans", "Inter", system-ui, sans-serif; position: relative; overflow: hidden; }
+  .screen.light { background: #f7f7f2; color: #121212; --dfi-muted: #667; }
+  .screen.dim { filter: brightness(.35); } .screen.off { filter: brightness(0); }
+  .scr-head { height: 26px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px;
+              font-size: 14px; font-weight: 700; border-bottom: 1px solid #2a2f36; }
+  .screen.light .scr-head { border-color: #ccc; }
+  .scr-rows { padding: 2px 0; }
+  .scr-row { height: 31px; display: flex; align-items: center; padding: 0 8px; gap: 8px; font-size: 16px; }
+  .badge { min-width: 40px; height: 22px; border-radius: 4px; color: #fff; font-weight: 700; font-size: 14px;
+           display: grid; place-items: center; padding: 0 4px; }
+  .badge.S { border-radius: 11px; }
+  .dir { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mins { font-weight: 700; min-width: 46px; text-align: right; }
+  .late { color: #ff9f40; } .verylate { color: #ff5a4f; }
+  .cancel .dir, .cancel .mins { text-decoration: line-through; color: var(--dfi-muted); }
+  .scr-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; font-size: 12px; color: var(--dfi-muted);
+              border-top: 1px solid #2a2f36; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
+  .screen.light .scr-foot { border-color: #ccc; }
+  .marquee { display: inline-block; padding-left: 100%; animation: mq 18s linear infinite; }
+  @keyframes mq { to { transform: translateX(-100%); } }
+  .offline { position: absolute; right: 6px; top: 30px; font-size: 11px; background: #b3261e; color: #fff; padding: 1px 5px; border-radius: 3px; }
+  .empty { padding: 60px 10px; text-align: center; color: var(--dfi-muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="h-sign">H</span> Mini-Haltestelle</h1>
+  <span class="meta" id="meta">…</span>
+</header>
+<main>
+  <section>
+    <h2>Live-Vorschau</h2>
+    <div class="row" style="margin-bottom:12px">
+      <div><label for="device">Gerät</label><input id="device" value="pi"></div>
+      <div><label for="theme">Theme</label>
+        <select id="theme"><option value="dark">Dunkel (DFI)</option><option value="light">Hell</option></select></div>
+    </div>
+    <div class="preview-wrap">
+      <div class="bezel">
+        <div class="btncol"><button class="hwbtn" data-btn="A" title="Profil zurück">A</button><button class="hwbtn" data-btn="B" title="Profil vor">B</button></div>
+        <div class="screen-scale x2"><div class="screen" id="screen"></div></div>
+        <div class="btncol"><button class="hwbtn" data-btn="X" title="Nachtmodus">X</button><div class="led" id="led"></div><button class="hwbtn" data-btn="Y" title="Neu laden">Y</button></div>
+      </div>
+    </div>
+    <p class="small">Die Taster rufen dieselben Endpunkte auf wie das Gerät. Das echte Display rendert der Client (Phase 2);
+      diese Vorschau zeigt Inhalt und Layout.</p>
+  </section>
+
+  <section>
+    <h2>Gehzeit-Assistent</h2>
+    <p class="small" style="margin-top:0">Findet Stationen bis 800 m um eine Adresse und berechnet den Fußweg über OpenStreetMap
+      (Transitous). Die Adresse geht dafür einmal an Transitous und wird nicht gespeichert.</p>
+    <div class="row">
+      <div><label for="home">Startadresse</label><input id="home" placeholder="Straße Hausnummer, Ort"></div>
+      <button id="nearbyBtn">Stationen suchen</button>
+    </div>
+    <div class="msg" id="nearbyMsg"></div>
+    <div id="nearbyOut"></div>
+    <div class="row" style="margin-top:14px">
+      <div><label for="work">Zieladresse (für „Jetzt los")</label><input id="work" placeholder="z. B. Arbeit"></div>
+      <button id="routeBtn">Verbindung vorschlagen</button>
+    </div>
+    <div class="msg" id="routeMsg"></div>
+    <div id="routeOut"></div>
+  </section>
+
+  <section>
+    <h2>Stationssuche</h2>
+    <div class="row">
+      <div><label for="q">Name</label><input id="q" placeholder="z. B. Merianplatz"></div>
+      <div style="flex:0 1 150px"><label for="prov">Provider</label>
+        <select id="prov"><option value="">aktiver</option><option value="transitous">transitous</option><option value="rmv">rmv</option></select></div>
+      <button id="searchBtn">Suchen</button>
+    </div>
+    <div class="msg" id="searchMsg"></div>
+    <div id="searchOut"></div>
+  </section>
+
+  <section>
+    <h2>Status</h2>
+    <div id="statusOut" class="small">…</div>
+  </section>
+
+  <section class="wide">
+    <h2>Konfiguration</h2>
+    <div class="row" style="margin-bottom:10px">
+      <div><label for="token">Bearbeitungs-Token (EDIT_TOKEN)</label><input id="token" type="password" autocomplete="off"></div>
+      <button id="loadBtn">Laden</button>
+      <button id="saveBtn" class="primary">Speichern</button>
+    </div>
+    <textarea id="cfg" spellcheck="false" placeholder="Token eingeben und „Laden“ drücken"></textarea>
+    <div class="msg" id="cfgMsg"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+$('device').value = store.get('device', 'pi');
+$('theme').value = store.get('theme', 'dark');
+$('token').value = store.get('token', '');
+for (const id of ['device', 'theme', 'token']) $(id).addEventListener('change', () => { store.set(id, $(id).value); poll(); });
+
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const hdr = () => ({ 'X-Edit-Token': $('token').value });
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  const ct = r.headers.get('content-type') || '';
+  const body = ct.includes('json') ? await r.json() : await r.text();
+  if (!r.ok) throw new Error(body?.detail ? (typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)) : body || r.status);
+  return body;
+}
+
+// ---------------- Vorschau ----------------
+let board = null;
+function minutesLabel(dep, now) {
+  const m = Math.floor((new Date(dep) - now) / 60000);
+  if (m <= 0) return 'jetzt';
+  if (m >= 60) return new Date(dep).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return m + "'";
+}
+function render() {
+  const el = $('screen');
+  if (!board) { el.innerHTML = '<div class="empty">verbinde …</div>'; return; }
+  const now = new Date();
+  el.className = 'screen' + ($('theme').value === 'light' ? ' light' : '') + (board.display.mode !== 'on' ? ' ' + board.display.mode : '');
+  const rows = board.rows.map((r) => {
+    const late = r.delay_min >= 5 ? 'verylate' : r.delay_min >= 2 ? 'late' : '';
+    return `<div class="scr-row${r.cancelled ? ' cancel' : ''}">
+      <span class="badge ${esc(r.product)}" style="background:${esc(r.color)}">${esc(r.line)}</span>
+      <span class="dir">${esc(r.direction)}</span>
+      <span class="mins ${late}">${r.cancelled ? 'fällt aus' : minutesLabel(r.departure, now)}</span></div>`;
+  }).join('') || '<div class="empty">keine erreichbaren Abfahrten</div>';
+  let foot = '';
+  if (board.messages.length) foot = `<span class="marquee">${esc(board.messages.join('  ·  '))}</span>`;
+  else foot = `&nbsp;Daten: ${esc(board.source)}`;
+  const off = board.stale && board.stale_since
+    ? `<div class="offline">offline seit ${Math.max(1, Math.round((now - new Date(board.stale_since)) / 60000))} min</div>` : '';
+  el.innerHTML = `<div class="scr-head"><span>${esc(board.title)}</span>
+      <span>${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></div>
+    <div class="scr-rows">${rows}</div>${off}<div class="scr-foot">${foot}</div>`;
+  const led = { ideal: '#2ecc40', hurry: '#ff9f1a' }[board.leave_signal];
+  $('led').style.background = led && board.display.mode === 'on' ? led : '#333';
+  $('led').style.boxShadow = led && board.display.mode === 'on' ? `0 0 8px ${led}` : 'none';
+}
+async function poll() {
+  try { board = await api('/api/board?device=' + encodeURIComponent($('device').value)); }
+  catch (e) { if (board) board.stale = true; }
+  render();
+}
+document.querySelectorAll('[data-btn]').forEach((b) => b.addEventListener('click', async () => {
+  const dev = encodeURIComponent($('device').value);
+  const k = b.dataset.btn;
+  const post = (p, body) => api(`/api/device/${dev}/${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  if (k === 'A') await post('profile', { step: -1 });
+  if (k === 'B') await post('profile', { step: 1 });
+  if (k === 'X') await post('night');
+  if (k === 'Y') await post('refresh');
+  poll();
+}));
+
+// ---------------- Status ----------------
+async function status() {
+  try {
+    const s = await api('/api/status');
+    $('meta').innerHTML = `v${esc(s.version)} · Provider <b>${esc(s.provider)}</b> · Intervall ${Math.round(s.interval_seconds)} s · `
+      + (s.provider === 'transitous' ? 'Daten: <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a>, © OpenStreetMap'
+        : 'Daten: RMV');
+    const st = Object.entries(s.stations).map(([id, e]) => `<tr><td><code>${esc(id)}</code></td><td>${e.polling ? 'aktiv' : 'pausiert'}</td>
+      <td>${e.ok ? new Date(e.ok).toLocaleTimeString('de-DE') : '–'}</td><td>${e.departures}</td><td>${e.requests}</td>
+      <td style="color:var(--err)">${esc(e.error || '')}</td></tr>`).join('');
+    const dv = Object.entries(s.devices).map(([d, e]) => `<tr><td>${esc(d)}</td><td>${esc(e.profile)}</td><td>${e.night ? 'Nacht' : 'Tag'}</td>
+      <td>${e.last_seen ? new Date(e.last_seen).toLocaleTimeString('de-DE') : '–'}</td></tr>`).join('');
+    $('statusOut').innerHTML = `<table><tr><th>Station</th><th>Poller</th><th>Stand</th><th>Abf.</th><th>Abrufe</th><th>Fehler</th></tr>${st || '<tr><td colspan=6>noch nichts abgefragt</td></tr>'}</table>
+      <table><tr><th>Gerät</th><th>Profil</th><th>Modus</th><th>zuletzt</th></tr>${dv || '<tr><td colspan=4>noch kein Gerät</td></tr>'}</table>
+      <p>Bearbeiten: ${s.editing_enabled ? 'an' : '<b>aus</b> (EDIT_TOKEN fehlt)'} · Push-Webhook: ${s.notify_enabled ? 'an' : 'aus'}</p>`;
+  } catch (e) { $('statusOut').textContent = 'Status nicht abrufbar: ' + e.message; }
+}
+
+// ---------------- Stationssuche ----------------
+$('searchBtn').addEventListener('click', async () => {
+  $('searchMsg').className = 'msg'; $('searchMsg').textContent = 'suche …'; $('searchOut').innerHTML = '';
+  try {
+    const p = $('prov').value ? '&provider=' + $('prov').value : '';
+    const res = await api('/api/stations?q=' + encodeURIComponent($('q').value) + p);
+    $('searchMsg').textContent = res.length + ' Treffer';
+    $('searchOut').innerHTML = '<table><tr><th>Name</th><th>ID</th><th>Verkehrsmittel</th></tr>' + res.map((m) =>
+      `<tr><td>${esc(m.name)}</td><td><code>${esc(m.provider)}: ${esc(m.id)}</code></td><td>${esc(m.products.join(', '))}</td></tr>`).join('') + '</table>';
+  } catch (e) { $('searchMsg').className = 'msg err'; $('searchMsg').textContent = e.message; }
+});
+$('q').addEventListener('keydown', (e) => e.key === 'Enter' && $('searchBtn').click());
+
+// ---------------- Assistent ----------------
+const yq = (s) => JSON.stringify(s);
+$('nearbyBtn').addEventListener('click', async () => {
+  $('nearbyMsg').className = 'msg'; $('nearbyMsg').textContent = 'suche Stationen und Fußwege …'; $('nearbyOut').innerHTML = '';
+  try {
+    const r = await api('/api/setup/nearby?address=' + encodeURIComponent($('home').value), { headers: hdr() });
+    $('nearbyMsg').textContent = `Gefunden: ${r.home.name} (${r.stops.length} Stationen)`;
+    $('nearbyOut').innerHTML = '<table><tr><th></th><th>Station</th><th>Fußweg</th><th>Verkehrsmittel</th></tr>' + r.stops.map((s, i) =>
+      `<tr><td><input type="checkbox" data-i="${i}" ${i < 2 ? 'checked' : ''}></td><td>${esc(s.name)}</td>
+       <td>${s.walk_minutes == null ? '–' : s.walk_minutes + ' min'}</td><td>${esc(s.products.join(', '))}</td></tr>`).join('') + '</table>'
+      + '<p class="small">Gehzeit = OSM-Fußweg aufgerundet + 1 min Puffer. Auswahl als YAML für <code>stops:</code> eines Profils:</p><pre id="nearbyYaml"></pre>';
+    const upd = () => {
+      const sel = [...$('nearbyOut').querySelectorAll('input:checked')].map((c) => r.stops[+c.dataset.i]);
+      $('nearbyYaml').textContent = sel.map((s) => `- name: ${yq(s.name.replace(/^Frankfurt \(Main\) /, ''))}\n  ids:\n    transitous: ${s.transitous_ids.length === 1 ? yq(s.transitous_ids[0]) : '[' + s.transitous_ids.map(yq).join(', ') + ']'}\n    # rmv: über die Stationssuche nachtragen\n  walk_minutes: ${s.walk_minutes ?? 10}\n  products: [${s.products.join(', ')}]`).join('\n');
+    };
+    $('nearbyOut').addEventListener('change', upd); upd();
+  } catch (e) { $('nearbyMsg').className = 'msg err'; $('nearbyMsg').textContent = e.message; }
+});
+$('routeBtn').addEventListener('click', async () => {
+  $('routeMsg').className = 'msg'; $('routeMsg').textContent = 'plane Verbindungen …'; $('routeOut').innerHTML = '';
+  try {
+    const r = await api(`/api/setup/route?home=${encodeURIComponent($('home').value)}&work=${encodeURIComponent($('work').value)}`, { headers: hdr() });
+    if (!r.suggestions.length) { $('routeMsg').textContent = 'Keine ÖPNV-Verbindung gefunden.'; return; }
+    $('routeMsg').textContent = `${r.home.name} → ${r.work.name}`;
+    const top = r.suggestions[0];
+    const dir = top.direction.replace(/^Frankfurt \(Main\) /, '');
+    $('routeOut').innerHTML = '<table><tr><th>Linie</th><th>Richtung</th><th>ab</th><th>Fußweg</th><th>Anteil</th></tr>' + r.suggestions.map((s) =>
+      `<tr><td>${esc(s.line)}</td><td>${esc(s.direction)}</td><td>${esc(s.stop)}</td><td>${s.walk_minutes} min</td><td>${s.count}×</td></tr>`).join('') + '</table>'
+      + `<p class="small">Vorschlag für <code>leave:</code> im Profil (Station muss im Profil unter diesem Namen stehen):</p>
+      <pre>leave:\n  line: ${yq(top.line)}\n  direction: ${yq(dir)}\n  stop: ${yq(top.stop.replace(/^Frankfurt \(Main\) /, ''))}\n  ideal: [2, 5]\n  hurry: [0, 2]\n  notify: true</pre>`;
+  } catch (e) { $('routeMsg').className = 'msg err'; $('routeMsg').textContent = e.message; }
+});
+
+// ---------------- Config ----------------
+$('loadBtn').addEventListener('click', async () => {
+  $('cfgMsg').className = 'msg';
+  try { $('cfg').value = await api('/api/config', { headers: hdr() }); $('cfgMsg').textContent = 'geladen'; }
+  catch (e) { $('cfgMsg').className = 'msg err'; $('cfgMsg').textContent = e.message; }
+});
+$('saveBtn').addEventListener('click', async () => {
+  $('cfgMsg').className = 'msg';
+  try {
+    const r = await api('/api/config', { method: 'PUT', headers: { ...hdr(), 'Content-Type': 'text/plain' }, body: $('cfg').value });
+    $('cfgMsg').className = 'msg ok'; $('cfgMsg').textContent = `${r.status} (vorherige Fassung in ${r.backup})`; poll();
+  } catch (e) { $('cfgMsg').className = 'msg err'; $('cfgMsg').textContent = e.message; }
+});
+
+poll(); status();
+setInterval(poll, 15000); setInterval(render, 1000); setInterval(status, 10000);
+</script>
+</body>
+</html>
