@@ -54,6 +54,8 @@ class RouteMatch(BaseModel):
     line: str
     direction_id: str | None = None
     headsign: str | None = None
+    travel_minutes: int | None = Field(None, description="Fahrzeit Station → Ziel (für die Ankunftszeit)")
+    transfers: int | None = None
 
 
 class Place(BaseModel):

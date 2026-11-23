@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .config import AppConfig, LeaveConfig, Place, ProfileConfig, RouteMatch, StopConfig
+from .config import AppConfig, Place, ProfileConfig, RouteMatch, StopConfig
 from .models import Product
 from .providers.base import ProviderError
 from .providers.transitous import MODE_MAP, TransitousProvider
@@ -212,13 +212,19 @@ def build_profile(
                 walk_minutes=o.walk_minutes,
             )
             stops[sname] = stop
-        route = RouteMatch(line=o.line, direction_id=o.direction_id, headsign=cfg.strip(o.headsign))
-        if route not in stop.routes:
+        route = RouteMatch(
+            line=o.line,
+            direction_id=o.direction_id,
+            headsign=cfg.strip(o.headsign),
+            travel_minutes=o.travel_minutes,
+            transfers=o.transfers,
+        )
+        if not any(r.line == route.line and r.direction_id == route.direction_id for r in stop.routes):
             stop.routes.append(route)
     return ProfileConfig(
         title=name,
         stops=list(stops.values()),
         origin=origin,
         destination=destination,
-        leave=LeaveConfig(),
+        leave=None,  # LED nur per „Erinnere mich" — bei dichtem Takt wäre sie sonst dauernd an
     )

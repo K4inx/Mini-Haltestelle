@@ -133,7 +133,11 @@ class Poller:
         missing = [s for s in ids if (e := self.cache.get(s)) is None or e.last_attempt_mono is None]
         if not missing:
             return
-        self.tick()
+        n = max(len(self._needed() | ids), 1)
+        for sid in missing:  # auch Stationen, die (noch) kein aktives Gerät braucht
+            self.cache.setdefault(sid, CacheEntry())
+            if sid not in self._inflight:
+                self._inflight[sid] = asyncio.create_task(self._fetch(sid, n))
         tasks = [self._inflight[s] for s in missing if s in self._inflight]
         if tasks:
             await asyncio.wait(tasks, timeout=timeout)

@@ -109,21 +109,44 @@
   .screen { width: 320px; height: 240px; transform-origin: 0 0; background: #0b0d10; color: #f4d35e;
             font-family: "DejaVu Sans", "Inter", system-ui, sans-serif; position: relative; overflow: hidden; --m: #8b96a3; }
   .screen.dim { filter: brightness(.35); } .screen.off { filter: brightness(0); }
-  .scr-head { height: 26px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px;
-              font-size: 14px; font-weight: 700; border-bottom: 1px solid #2a2f36; gap: 8px; }
-  .scr-head span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scr-head { height: 26px; display: flex; align-items: center; padding: 0 8px; gap: 6px;
+              font-size: 14px; font-weight: 700; border-bottom: 1px solid #2a2f36; }
+  .scr-head .tt { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scr-head .bell { font-size: 12px; color: #9fe0a8; font-weight: 600; white-space: nowrap; }
   .scr-row { height: 31px; display: flex; align-items: center; padding: 0 8px; gap: 8px; font-size: 16px; }
-  .scr-row .badge { min-width: 40px; height: 22px; border-radius: 4px; color: #fff; font-weight: 700; font-size: 14px; display: grid; place-items: center; padding: 0 4px; }
+  .badge { min-width: 40px; height: 22px; border-radius: 4px; color: #fff; font-weight: 700; font-size: 14px; display: grid; place-items: center; padding: 0 4px; }
   .scr-row .d { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .scr-row .m { font-weight: 700; min-width: 46px; text-align: right; }
-  .scr-row .lt { color: #ff9f40; } .scr-row .vl { color: #ff5a4f; }
+  .scr-row.rem { background: #13301b; }
+  .lt { color: #ff9f40; } .vl { color: #ff5a4f; }
   .scr-row.x .d, .scr-row.x .m { text-decoration: line-through; color: var(--m); }
   .scr-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; font-size: 12px; color: var(--m);
-              border-top: 1px solid #2a2f36; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
-  .marquee { display: inline-block; padding-left: 100%; animation: mq 18s linear infinite; }
+              border-top: 1px solid #2a2f36; display: flex; align-items: center; gap: 6px; padding-right: 6px; overflow: hidden; white-space: nowrap; }
+  .scr-foot .fl { flex: 1; overflow: hidden; padding-left: 8px; }
+  .scr-foot .fl.mq { padding-left: 0; }
+  .scr-foot .fr { font-size: 10px; opacity: .8; }
+  .marquee { display: inline-block; padding-left: 100%; animation: mq var(--mq, 18s) linear infinite; }
   @keyframes mq { to { transform: translateX(-100%); } }
   .offline { position: absolute; right: 6px; top: 30px; font-size: 11px; background: #b3261e; color: #fff; padding: 1px 5px; border-radius: 3px; }
   .scr-empty { padding: 60px 10px; text-align: center; color: var(--m); font-size: 14px; }
+  /* Detail-Ansicht */
+  .det { padding: 8px 10px; display: grid; gap: 6px; }
+  .det-top { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; }
+  .det-top .badge { font-size: 16px; height: 26px; min-width: 46px; }
+  .det-top span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .det-sub { font-size: 13px; color: var(--m); }
+  .det-big { display: flex; align-items: baseline; gap: 10px; }
+  .det-big b { font-size: 40px; line-height: 1; }
+  .det-big span { font-size: 16px; }
+  .det-line { font-size: 14px; }
+  .det-line em { font-style: normal; color: var(--m); }
+  /* Info-Ansicht */
+  .info { padding: 10px 12px; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; }
+  .info dt { color: var(--m); } .info dd { margin: 0; }
+  .led.blink { animation: blink 1s steps(2, start) infinite; } .led.fast { animation-duration: .4s; }
+  @keyframes blink { to { visibility: hidden; } }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; }
+  .hint b { color: var(--ink); }
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
   th, td { text-align: left; padding: 5px; border-bottom: 1px solid var(--line); }
@@ -140,11 +163,17 @@
   <div class="stack">
     <section aria-labelledby="h-display">
       <h2 id="h-display">Display</h2>
-      <p class="lead">So sieht es gerade auf dem Gerät aus. A/B wechselt die Vorlage, X Nachtmodus, Y neu laden.</p>
+      <p class="lead">So sieht es gerade auf dem Gerät aus. Die Taster funktionieren wie am Gerät.</p>
       <div class="bezel">
         <div class="btncol"><button class="hwbtn" data-btn="A" title="Vorherige Vorlage">A</button><button class="hwbtn" data-btn="B" title="Nächste Vorlage">B</button></div>
         <div class="screen-scale"><div class="screen" id="screen"></div></div>
-        <div class="btncol"><button class="hwbtn" data-btn="X" title="Nachtmodus an/aus">X</button><span class="led" id="led" title="LED: grün = jetzt los, orange = knapp"></span><button class="hwbtn" data-btn="Y" title="Neu laden">Y</button></div>
+        <div class="btncol"><button class="hwbtn" data-btn="X" title="kurz: Details · 3 s: Nachtmodus">X</button><span class="led" id="led" title="LED: grün = jetzt los, orange = knapp"></span><button class="hwbtn" data-btn="Y" title="kurz: Erinnere mich · 3 s: Info">Y</button></div>
+      </div>
+      <div class="hint">
+        <b>A / B</b><span>vorherige / nächste Vorlage</span>
+        <b>X</b><span>Details zur nächsten Bahn · <i>3 s halten:</i> Nachtmodus an/aus</span>
+        <b>Y</b><span>Erinnere mich an die nächste Bahn (nochmal = aus) · <i>3 s halten:</i> Info</span>
+        <b>nachts</b><span>jede Taste macht das Display 30 s hell</span>
       </div>
     </section>
 
@@ -390,34 +419,143 @@ $('tpls').addEventListener('click', async (e) => {
 });
 
 // ================= Display-Vorschau =================
-let board = null;
-const minutesLabel = (dep, now) => { const m = Math.floor((new Date(dep) - now) / 60000); return m <= 0 ? 'jetzt' : m >= 60 ? hhmm(dep) : m + "'"; };
-function render() {
-  const el = $('screen');
-  if (!board) { el.innerHTML = '<div class="scr-empty">verbinde …</div>'; return; }
-  const now = new Date();
-  el.className = 'screen' + (board.display.mode !== 'on' ? ' ' + board.display.mode : '');
-  const rows = board.rows.map((r) => {
-    const late = r.delay_min >= 5 ? 'vl' : r.delay_min >= 2 ? 'lt' : '';
-    return `<div class="scr-row${r.cancelled ? ' x' : ''}"><span class="badge" style="background:${esc(r.color)}">${esc(r.line)}</span>
-      <span class="d">${esc(r.direction)}</span><span class="m ${late}">${r.cancelled ? 'fällt aus' : minutesLabel(r.departure, now)}</span></div>`;
-  }).join('') || `<div class="scr-empty">${board.profile ? 'keine Abfahrt, die du noch schaffst' : 'keine Vorlage'}</div>`;
-  const foot = board.messages.length ? `<span class="marquee">${esc(board.messages.join('  ·  '))}</span>` : `&nbsp;Daten: ${esc(board.source)}`;
-  const off = board.stale && board.stale_since ? `<div class="offline">offline seit ${Math.max(1, Math.round((now - new Date(board.stale_since)) / 60000))} min</div>` : '';
-  el.innerHTML = `<div class="scr-head"><span>${esc(board.title)}</span><span>${hhmm(now)}</span></div><div>${rows}</div>${off}<div class="scr-foot">${foot}</div>`;
-  const led = { ideal: '#2ecc40', hurry: '#ff9f1a' }[board.leave_signal];
-  const on = led && board.display.mode === 'on';
-  $('led').style.background = on ? led : '#333'; $('led').style.boxShadow = on ? `0 0 8px ${led}` : 'none';
+// Aufbau wie auf dem Gerät: Gerüst einmal anlegen, danach nur ändern, was sich ändert.
+let board = null, view = 'list', wakeUntil = 0, status = null;
+const scr = $('screen');
+scr.innerHTML = `<div class="scr-head"><span class="tt" id="sTitle"></span><span class="bell" id="sBell"></span><span id="sClock"></span></div>
+  <div id="sBody"></div><div class="offline" id="sOff" hidden></div>
+  <div class="scr-foot"><span class="fl" id="sFootL"></span><span class="fr" id="sFootR"></span></div>`;
+const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };
+const setHTML = (el, h) => { if (el.dataset.h !== h) { el.dataset.h = h; el.innerHTML = h; } };
+const minsTo = (iso, now) => Math.floor((new Date(iso) - now) / 60000);
+const minutesLabel = (iso, now) => { const m = minsTo(iso, now); return m <= 0 ? 'jetzt' : m >= 60 ? hhmm(iso) : m + "'"; };
+const lateCls = (d) => d >= 5 ? 'vl' : d >= 2 ? 'lt' : '';
+const awake = () => Date.now() < wakeUntil;
+const focusRow = () => {
+  if (!board) return null;
+  const k = board.reminder && board.rows.find((r) => r.departure === board.reminder.departure && r.line === board.reminder.line);
+  return k || board.rows.find((r) => !r.cancelled) || null;
+};
+
+function renderBody() {            // bei neuen Daten oder Ansichtswechsel
+  const body = $('sBody');
+  if (!board) { setHTML(body, '<div class="scr-empty">verbinde …</div>'); return; }
+  if (view === 'info') {
+    const ok = !board.stale;
+    setHTML(body, `<dl class="info"><dt>Server</dt><dd>${ok ? 'erreichbar' : 'Probleme'}</dd>
+      <dt>Datenquelle</dt><dd>${esc(board.source)}</dd>
+      <dt>Stand</dt><dd>${hhmm(board.generated_at)}</dd>
+      <dt>Vorlage</dt><dd>${esc(board.title)} (${board.profiles.indexOf(board.profile) + 1}/${board.profiles.length})</dd>
+      <dt>Version</dt><dd>${esc(status?.version || '?')}</dd>
+      <dt>IP, WLAN</dt><dd>nur am echten Gerät</dd></dl>`);
+    return;
+  }
+  if (view === 'detail') {
+    const r = focusRow();
+    if (!r) { setHTML(body, '<div class="scr-empty">keine Abfahrt, die du noch schaffst</div>'); return; }
+    const plat = r.platform ? ` · Gleis ${esc(r.platform)}` : '';
+    const delay = r.delay_min > 0 ? ` <span class="${lateCls(r.delay_min)}">+${r.delay_min}</span>` : '';
+    const leave = new Date(new Date(r.departure) - r.walk_minutes * 60000).toISOString();
+    const arr = r.arrival ? `<div class="det-line"><em>Ankunft${board.destination ? ' ' + esc(board.destination) : ''}</em> ca. ${hhmm(r.arrival)}${r.transfers != null ? ` <em>· ${r.transfers ? r.transfers + '× umsteigen' : 'direkt'}</em>` : ''}</div>` : '';
+    setHTML(body, `<div class="det">
+      <div class="det-top"><span class="badge" style="background:${esc(r.color)}">${esc(r.line)}</span><span>${esc(r.direction)}</span></div>
+      <div class="det-sub">ab ${esc(r.stop)}${plat}</div>
+      <div class="det-big"><b data-dep="${esc(r.departure)}" class="m"></b><span>${hhmm(r.departure)}${delay}</span></div>
+      <div class="det-line"><em>Losgehen spätestens</em> ${hhmm(leave)} <em>(${Math.round(r.walk_minutes)} min Fußweg)</em></div>
+      ${arr}</div>`);
+    return;
+  }
+  const remDep = board.reminder?.departure, remLine = board.reminder?.line;
+  const rows = board.rows.map((r) => `<div class="scr-row${r.cancelled ? ' x' : ''}${r.departure === remDep && r.line === remLine ? ' rem' : ''}">
+      <span class="badge" style="background:${esc(r.color)}">${esc(r.line)}</span><span class="d">${esc(r.direction)}</span>
+      <span class="m ${lateCls(r.delay_min)}" ${r.cancelled ? '' : `data-dep="${esc(r.departure)}"`}>${r.cancelled ? 'fällt aus' : ''}</span></div>`).join('');
+  setHTML(body, rows || `<div class="scr-empty">${board.profile ? 'keine Abfahrt, die du noch schaffst' : 'keine Vorlage'}</div>`);
 }
-async function poll() { try { board = await api('/api/board?device=' + DEVICE); } catch { if (board) board.stale = true; } render(); }
-document.querySelectorAll('[data-btn]').forEach((b) => b.addEventListener('click', async () => {
-  const k = b.dataset.btn;
-  if (k === 'A') await post(`/api/device/${DEVICE}/profile`, { step: -1 });
-  if (k === 'B') await post(`/api/device/${DEVICE}/profile`, { step: 1 });
-  if (k === 'X') await post(`/api/device/${DEVICE}/night`);
-  if (k === 'Y') await post(`/api/device/${DEVICE}/refresh`);
-  poll(); loadTemplates();
-}));
+
+function renderFoot() {            // nur bei neuen Daten: Lauftext startet sonst ständig neu
+  if (!board) return;
+  const fl = $('sFootL');
+  let left;
+  if (view === 'detail' || board.messages.length) {
+    const msgs = board.messages.join('   ·   ');
+    if (msgs) {
+      const sec = Math.max(10, Math.round(msgs.length / 5));
+      left = `<span class="marquee" style="--mq:${sec}s">${esc(msgs)}</span>`;
+    } else left = '';
+  } else {
+    const r = focusRow();
+    left = r && r.arrival ? `Ankunft${board.destination ? ' ' + esc(board.destination) : ''} ca. ${hhmm(r.arrival)}` : '';
+  }
+  fl.classList.toggle('mq', left.startsWith('<span class="marquee"'));
+  setHTML(fl, left);
+  setText($('sFootR'), board.source);
+}
+
+function tick() {                  // jede Sekunde: nur Uhr, Minuten, Hinweise, LED
+  const now = new Date();
+  setText($('sClock'), hhmm(now));
+  if (!board) return;
+  setText($('sTitle'), view === 'info' ? 'Info' : board.title);
+  setText($('sBell'), board.reminder ? '🔔 ' + hhmm(board.reminder.leave_at) : '');
+  scr.querySelectorAll('[data-dep]').forEach((el) => {
+    const t = el.classList.contains('m') && el.tagName === 'B'
+      ? (minsTo(el.dataset.dep, now) <= 0 ? 'jetzt' : 'in ' + minsTo(el.dataset.dep, now) + ' min')
+      : minutesLabel(el.dataset.dep, now);
+    setText(el, t);
+  });
+  const off = $('sOff');
+  off.hidden = !(board.stale && board.stale_since);
+  if (!off.hidden) setText(off, `offline seit ${Math.max(1, Math.round((now - new Date(board.stale_since)) / 60000))} min`);
+  const mode = awake() ? 'on' : board.display.mode;
+  const cls = 'screen' + (mode !== 'on' ? ' ' + mode : '');
+  if (scr.className !== cls) scr.className = cls;
+  const sig = mode === 'on' ? board.leave_signal : 'none';
+  const color = { ideal: '#2ecc40', hurry: '#ff9f1a' }[sig];
+  const led = $('led');
+  led.style.background = color || '#333'; led.style.boxShadow = color ? `0 0 8px ${color}` : 'none';
+  led.className = 'led' + (color && board.reminder ? ' blink' + (sig === 'hurry' ? ' fast' : '') : '');
+}
+
+function setBoard(b) { board = b; renderBody(); renderFoot(); tick(); }
+async function poll() { try { setBoard(await api('/api/board?device=' + DEVICE)); } catch { if (board) { board.stale = true; tick(); } } }
+async function loadStatus() { try { status = await api('/api/status'); } catch {} }
+
+// Taster: kurz / 3 s halten — wie am Gerät
+const LONG_MS = 3000;
+const actions = {
+  A: { short: () => post(`/api/device/${DEVICE}/profile`, { step: -1 }) },
+  B: { short: () => post(`/api/device/${DEVICE}/profile`, { step: 1 }) },
+  X: { short: () => { view = view === 'detail' ? 'list' : 'detail'; }, long: () => post(`/api/device/${DEVICE}/night`) },
+  Y: { short: async () => { try { await post(`/api/device/${DEVICE}/remind`); } catch (e) { flash(e.message); } },
+       long: async () => { await loadStatus(); view = view === 'info' ? 'list' : 'info'; } },
+};
+function flash(text) { setHTML($('sBody'), `<div class="scr-empty">${esc(text)}</div>`); setTimeout(renderBody, 2500); }
+document.querySelectorAll('[data-btn]').forEach((b) => {
+  let timer = null, longDone = false;
+  const down = (e) => {
+    e.preventDefault(); longDone = false;
+    const a = actions[b.dataset.btn];
+    if (a.long) timer = setTimeout(async () => { longDone = true; if (!wake()) { await a.long(); after(); } }, LONG_MS);
+  };
+  const up = async () => {
+    clearTimeout(timer);
+    if (longDone) return;
+    if (wake()) return;
+    if (view === 'info' && b.dataset.btn !== 'Y') view = 'list';
+    await actions[b.dataset.btn].short(); after();
+  };
+  b.addEventListener('pointerdown', down);
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointerleave', () => clearTimeout(timer));
+  b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); up(); } });
+});
+// Nachts: erster Druck weckt nur das Display (30 s), löst nichts aus
+function wake() {
+  if (board && board.display.mode !== 'on' && !awake()) { wakeUntil = Date.now() + 30000; tick(); return true; }
+  if (awake()) wakeUntil = Date.now() + 30000;
+  return false;
+}
+async function after() { await poll(); loadTemplates(); }
 
 // ================= Nachtmodus =================
 async function loadSettings() {
@@ -453,8 +591,8 @@ function fitScreen() {
 }
 window.addEventListener('resize', fitScreen); fitScreen();
 
-poll(); loadTemplates(); loadSettings();
-setInterval(poll, 15000); setInterval(render, 1000); setInterval(loadTemplates, 30000); setInterval(tech, 15000);
+poll(); loadTemplates(); loadSettings(); loadStatus();
+setInterval(poll, 15000); setInterval(tick, 1000); setInterval(loadTemplates, 30000); setInterval(tech, 15000);
 </script>
 </body>
 </html>

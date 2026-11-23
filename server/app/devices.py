@@ -27,6 +27,8 @@ class DeviceState(BaseModel):
     night: bool | None = None  # None = automatisch
     night_until: datetime | None = None
     last_seen: datetime | None = None
+    reminder_key: str | None = None  # „Erinnere mich": Kennung der gemerkten Fahrt
+    reminder_profile: str | None = None
 
 
 class DeviceStore:
@@ -95,6 +97,16 @@ class DeviceStore:
         st.night_until = board.next_change(lambda t: board.is_night(cfg, t), now)
         self.save()
         return st.night
+
+    def set_reminder(self, device: str, key: str | None, profile: str | None = None) -> None:
+        st = self.get(device)
+        st.reminder_key, st.reminder_profile = key, profile if key else None
+        self.save()
+
+    def reminder(self, device: str, profile: str | None) -> str | None:
+        """Erinnerung gilt nur in der Vorlage, in der sie gesetzt wurde."""
+        st = self.get(device)
+        return st.reminder_key if st.reminder_profile == profile else None
 
     def reset(self, device: str) -> None:
         self.devices[device] = DeviceState(last_seen=self.get(device).last_seen)

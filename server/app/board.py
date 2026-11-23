@@ -22,6 +22,7 @@ from .models import (
     DisplayMode,
     DisplayState,
     LeaveSignal,
+    Reminder,
 )
 
 # --------------------------------------------------------------------------- #
@@ -197,13 +198,35 @@ def build_board(
     night: bool,
     stale_since: datetime | None,
     source: str,
+    reminder_key: str | None = None,
 ) -> tuple[Board, tuple[Departure, StopConfig] | None]:
-    """Liefert das Board und (für die Push-Logik) die Fahrt, die das Leave-Signal auslöst."""
+    """Liefert das Board und (für die Push-Logik) die Fahrt, die das Leave-Signal auslöst.
+
+    Mit ``reminder_key`` folgt das Signal nur dieser Fahrt („Erinnere mich"). Ist sie nicht
+    mehr erreichbar, fehlt ``board.reminder`` — der Aufrufer löscht die Erinnerung dann.
+    """
     profile = cfg.profiles[profile_name]
     items = collect(profile, deps_by_stop, now)
-    signal, trigger = leave_signal(profile.leave, items, now)
+    reminder: Reminder | None = None
+    if reminder_key is not None:
+        hit = [(d, s) for d, s in items if d.key == reminder_key and not d.cancelled]
+        signal, trigger = leave_signal(LeaveConfig(), hit, now)
+        if hit:
+            d, s = hit[0]
+            reminder = Reminder(
+                line=d.line,
+                direction=cfg.strip(d.direction),
+                stop=cfg.strip(d.stop or s.name),
+                departure=d.departure.astimezone(now.tzinfo),
+                leave_at=(d.departure - timedelta(minutes=s.walk_minutes)).astimezone(now.tzinfo),
+                signal=signal,
+            )
+    else:
+        signal, trigger = leave_signal(profile.leave, items, now)
     if night:
         signal, trigger = LeaveSignal.NONE, None
+        if reminder:
+            reminder.signal = LeaveSignal.NONE
 
     rows = [
         BoardRow(
@@ -218,6 +241,10 @@ def build_board(
             reachable=True,
             platform=d.platform,
             color=cfg.color_for(d.product),
+            walk_minutes=s.walk_minutes,
+            arrival=_arrival(d, s, now),
+            transfers=_route(d, s).transfers if _route(d, s) else None,
+            key=d.key,
         )
         for d, s in sort_rows(items, profile.sort)[: profile.max_rows]
     ]
@@ -239,5 +266,18 @@ def build_board(
         rows=rows,
         messages=messages,
         source=source,
+        destination=cfg.strip(profile.destination.name) if profile.destination else None,
+        reminder=reminder,
     )
     return board, trigger
+
+
+def _route(dep: Departure, stop: StopConfig) -> RouteMatch | None:
+    return next((r for r in stop.routes if route_hit(r, dep)), None)
+
+
+def _arrival(dep: Departure, stop: StopConfig, now: datetime) -> datetime | None:
+    r = _route(dep, stop)
+    if r is None or r.travel_minutes is None or dep.cancelled:
+        return None
+    return (dep.departure + timedelta(minutes=r.travel_minutes)).astimezone(now.tzinfo)

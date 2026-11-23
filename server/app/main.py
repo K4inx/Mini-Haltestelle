@@ -71,7 +71,7 @@ class Runtime:
         save_config(self.config_path, cfg)
         self.cfg = cfg
 
-    def build(self, profile: str, now: datetime, *, night: bool = False):
+    def build(self, profile: str, now: datetime, *, night: bool = False, reminder_key: str | None = None):
         ids_by_stop = self.station_ids(profile)
         all_ids = {i for ids in ids_by_stop.values() for i in ids}
         deps = {
@@ -85,6 +85,7 @@ class Runtime:
             night=night,
             stale_since=self.poller.stale_since(all_ids),
             source=self.provider.attribution,
+            reminder_key=reminder_key,
         )
 
 
@@ -206,11 +207,34 @@ def create_app(runtime: Runtime | None = None, *, start_poller: bool = True) -> 
             return _no_template_board(rt, now)
         night = rt.devices.night(rt.cfg, device, now)
         await rt.poller.ensure_loaded({i for ids in rt.station_ids(profile).values() for i in ids})
-        result, trigger = rt.build(profile, now, night=night)
+        rkey = rt.devices.reminder(device, profile)
+        result, trigger = rt.build(profile, now, night=night, reminder_key=rkey)
         p = rt.cfg.profiles[profile]
-        if trigger and p.leave and p.leave.notify and result.leave_signal == "ideal":
+        if rkey and result.reminder is None and not result.stale:
+            rt.devices.set_reminder(device, None)  # Fahrt weg oder nicht mehr zu schaffen
+        wants_push = rkey or (p.leave and p.leave.notify and result.leave_signal == "ideal")
+        if trigger and result.leave_signal != "none" and wants_push:
             await rt.notifier.maybe_send(profile, p.title, trigger[0], trigger[1], now)
         return result
+
+    @app.post("/api/device/{device}/remind")
+    async def remind(rt: RT, device: str) -> dict[str, Any]:
+        """Taster Y: nächste erreichbare Fahrt merken — oder eine bestehende Erinnerung löschen."""
+        now = rt.now()
+        profile = rt.devices.profile(rt.cfg, device, now)
+        if profile is None:
+            raise HTTPException(409, "Keine Vorlage aktiv")
+        if rt.devices.reminder(device, profile):
+            rt.devices.set_reminder(device, None)
+            return {"reminder": None}
+        await rt.poller.ensure_loaded({i for ids in rt.station_ids(profile).values() for i in ids})
+        b, _ = rt.build(profile, now)
+        first = next((r for r in b.rows if not r.cancelled), None)
+        if first is None:
+            raise HTTPException(409, "Keine Abfahrt, die du noch schaffst")
+        rt.devices.set_reminder(device, first.key, profile)
+        result, _ = rt.build(profile, now, reminder_key=first.key)
+        return {"reminder": result.reminder.model_dump(mode="json") if result.reminder else None}
 
     @app.post("/api/device/{device}/profile")
     async def change_profile(rt: RT, device: str, body: ProfileChange) -> dict[str, str | None]:

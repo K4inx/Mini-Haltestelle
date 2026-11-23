@@ -103,6 +103,21 @@ class BoardRow(BaseModel):
     reachable: bool = True
     platform: str | None = None
     color: str | None = Field(None, description="Badge-Farbe als #rrggbb (aus der Config)")
+    walk_minutes: float = Field(0, description="Fußweg zur Station")
+    arrival: datetime | None = Field(None, description="Geschätzte Ankunft am Ziel der Vorlage")
+    transfers: int | None = Field(None, description="Umstiege bis zum Ziel (aus der Verbindungssuche)")
+    key: str = Field("", description="Kennung der Fahrt (z. B. für die Erinnerung)")
+
+
+class Reminder(BaseModel):
+    """„Erinnere mich" (Taster Y): eine gemerkte Fahrt, die LED folgt nur ihr."""
+
+    line: str
+    direction: str
+    stop: str
+    departure: datetime
+    leave_at: datetime = Field(description="Spätestens losgehen (Abfahrt − Fußweg)")
+    signal: LeaveSignal
 
 
 class Board(BaseModel):
@@ -117,3 +132,5 @@ class Board(BaseModel):
     rows: list[BoardRow] = Field(default_factory=list)
     messages: list[str] = Field(default_factory=list)
     source: str = Field(description="Datenquelle für die Quellenangabe, z. B. 'Transitous'")
+    destination: str | None = Field(None, description="Ziel der Vorlage, für „Ankunft <Ziel> ca. …“")
+    reminder: Reminder | None = None

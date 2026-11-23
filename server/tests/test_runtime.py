@@ -343,3 +343,65 @@ def test_no_templates_board(client):
 def test_healthz_and_index(client):
     assert client.get("/healthz").json()["status"] == "ok"
     assert client.get("/").status_code == 200
+
+
+def _make_template(client, name="Arbeit", **opt):
+    body = {
+        "name": name,
+        "origin": {"name": "Berger Straße 100", "lat": 1, "lon": 2},
+        "destination": {"name": "Frankfurt (Main) Höchst", "lat": 1, "lon": 2},
+        "options": [_option(**opt)],
+    }
+    assert client.post("/api/templates", json=body).status_code == 200
+    client.post("/api/device/pi/profile", json={"profile": name})
+
+
+def test_arrival_and_detail_fields(client):
+    _make_template(client, travel_minutes=20, transfers=1)
+    b = client.get("/api/board", params={"device": "pi"}).json()
+    row = b["rows"][0]
+    # Abfahrt 07:38 (+8 min ab 07:30), Fahrzeit 20 min
+    assert row["arrival"].startswith("2026-11-23T07:58")
+    assert row["transfers"] == 1 and row["walk_minutes"] == 5 and row["key"] == "T1"
+    assert b["destination"] == "Höchst"
+    assert b["leave_signal"] == "none"  # ohne Erinnerung bleibt die LED aus
+
+
+def test_reminder_lifecycle(client):
+    _make_template(client)
+    resp = client.post("/api/device/pi/remind")
+    assert resp.status_code == 200, resp.text
+    r = resp.json()["reminder"]
+    assert r["line"] == "U4" and r["leave_at"].startswith("2026-11-23T07:33")
+    b = client.get("/api/board", params={"device": "pi"}).json()
+    # Abfahrt in 8 min, 5 min Fußweg → 3 min Puffer → ideal
+    assert b["reminder"]["signal"] == "ideal" and b["leave_signal"] == "ideal"
+    # nochmal Y → aus
+    assert client.post("/api/device/pi/remind").json() == {"reminder": None}
+    assert client.get("/api/board", params={"device": "pi"}).json()["reminder"] is None
+
+
+def test_reminder_expires_when_train_unreachable(client):
+    _make_template(client)
+    client.post("/api/device/pi/remind")
+    later = local("2026-11-23T07:35")  # Abfahrt 07:38, Fußweg 5 → nicht mehr zu schaffen
+    client.rt.now = lambda: later
+    b = client.get("/api/board", params={"device": "pi"}).json()
+    assert b["reminder"] is None and b["leave_signal"] == "none"
+    assert client.rt.devices.get("pi").reminder_key is None
+
+
+def test_reminder_without_departures(client):
+    from app.config import AppConfig
+
+    client.rt.cfg = AppConfig()
+    assert client.post("/api/device/pi/remind").status_code == 409
+
+
+async def test_ensure_loaded_fetches_unneeded_station(cfg_dict):
+    prov = FakeProvider()
+    p, _ = make_poller(cfg_dict, prov, set())  # kein aktives Gerät
+    await p.ensure_loaded({"x"})
+    assert prov.calls == ["x"]
+    await p.ensure_loaded({"x"})  # schon versucht → kein zweiter Abruf
+    assert prov.calls == ["x"]

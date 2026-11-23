@@ -28,11 +28,19 @@ Server auf. Der Client zeigt nur an.
       "departure": "2026-11-23T18:29:00+01:00",
       "planned": "2026-11-23T18:28:00+01:00",
       "delay_min": 1, "cancelled": false, "reachable": true,
-      "platform": null, "color": "#1c62b0"
+      "platform": "2", "color": "#1c62b0",
+      "walk_minutes": 5, "arrival": "2026-11-23T18:49:00+01:00", "transfers": 1,
+      "key": "20261123_18:05_de-DELFI_3454095106"
     }
   ],
   "messages": ["Aufzug Merianplatz außer Betrieb"],
-  "source": "Transitous"
+  "source": "Transitous",
+  "destination": "Höchst",
+  "reminder": {
+    "line": "U4", "direction": "Bockenheimer Warte", "stop": "Merianplatz",
+    "departure": "2026-11-23T18:29:00+01:00", "leave_at": "2026-11-23T18:24:00+01:00",
+    "signal": "ideal"
+  }
 }
 ```
 
@@ -50,7 +58,22 @@ Server auf. Der Client zeigt nur an.
 | `rows[].product` | `S` · `U` · `TRAM` · `BUS` · `REGIO` · `FERN` · `OTHER` |
 | `rows[].color` | Badge-Farbe `#rrggbb` aus der Config (Standard oder überschrieben). |
 | `messages` | Störungs-/Hinweistexte, dedupliziert → Lauftext. |
-| `source` | Datenquelle für die Quellenangabe (`Transitous` oder `RMV`). |
+| `source` | Datenquelle für die Quellenangabe (`Transitous` oder `RMV`). Rechts klein in der Fußzeile. |
+| `rows[].walk_minutes` | Fußweg zur Station → „Losgehen spätestens“ in der Detail-Ansicht. |
+| `rows[].arrival`, `transfers` | Geschätzte Ankunft am Ziel (Abfahrt + Fahrzeit aus der Verbindungssuche) und Umstiege. Fehlt bei Vorlagen ohne diese Angabe. |
+| `rows[].key` | Kennung der Fahrt. |
+| `destination` | Ziel der Vorlage, für „Ankunft Höchst ca. 08:42“. |
+| `reminder` | Aktive Erinnerung (Taster Y) oder `null`. Die LED folgt dann nur ihr und **blinkt** (`hurry` schneller). Ohne Erinnerung ist `leave_signal` bei Vorlagen `none`. |
+
+### Darstellung (Client)
+
+| Ansicht | Inhalt |
+|---|---|
+| Liste (Standard) | Kopf: Titel, ggf. 🔔 + Losgeh-Zeit, Uhr · bis zu 6 Zeilen · Fußzeile: Lauftext mit Meldungen, sonst „Ankunft <Ziel> ca. HH:MM“ der nächsten Bahn; rechts klein `source` |
+| Detail (X) | nächste (bzw. gemerkte) Bahn groß: Linie, Richtung, Station/Gleis, „in N min“, Uhrzeit + Verspätung, „Losgehen spätestens“, Ankunft + Umstiege; Fußzeile: Meldungen |
+| Info (Y 3 s) | IP, WLAN, Server, Version, Stand |
+
+Neu gezeichnet wird nur, was sich ändert: Uhr und Minuten jede Sekunde, Zeilen und Fußzeile nur bei neuen Daten (sonst startet der Lauftext ständig neu).
 
 Zeiten sind ISO 8601 mit Offset.
 
@@ -60,6 +83,7 @@ Zeiten sind ISO 8601 mit Offset.
 |---|---|---|
 | `POST /api/device/<id>/profile` | `{"step": 1}` / `{"step": -1}` / `{"profile": "abends"}` | Profil wechseln. Gilt bis zum nächsten Wechsel im Zeitplan. Antwort `{"profile": "..."}` |
 | `POST /api/device/<id>/night` | — | Nachtmodus umschalten. Gilt bis zum nächsten automatischen Wechsel. Antwort `{"night": true}` |
+| `POST /api/device/<id>/remind` | — | Taster Y: nächste erreichbare Bahn merken; ist schon eine gemerkt, wird sie gelöscht. Antwort `{"reminder": {...}}` bzw. `{"reminder": null}`, 409 ohne Abfahrt. Erlischt von selbst, wenn die Bahn nicht mehr zu schaffen ist. Mit `NOTIFY_WEBHOOK_URL` kommt beim Signal ein Push. |
 | `POST /api/device/<id>/refresh` | — | Sofort neu abrufen (höchstens so oft, wie der Provider erlaubt). |
 | `POST /api/device/<id>/reset` | — | Manuelle Wahl verwerfen. |
 
