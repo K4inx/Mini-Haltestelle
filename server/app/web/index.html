@@ -100,13 +100,13 @@
   .empty-state { color: var(--muted); padding: 10px 0; }
 
   /* ---------- Display-Vorschau 320×240 ---------- */
-  .bezel { background: #222; padding: 12px; border-radius: 10px; display: inline-flex; gap: 8px; align-items: center; max-width: 100%; }
+  .bezel { background: #222; padding: 12px; border-radius: 10px; display: flex; gap: 8px; align-items: center; width: max-content; max-width: 100%; }
   .btncol { display: flex; flex-direction: column; gap: 40px; align-items: center; }
   .hwbtn { width: 28px; height: 28px; border-radius: 50%; border: 0; background: #444; color: #ddd; font-weight: 700; font-size: 12px; padding: 0; }
   .hwbtn:active { background: #666; }
   .led { width: 10px; height: 10px; border-radius: 50%; background: #333; }
-  .screen-scale { width: 256px; height: 192px; overflow: hidden; }
-  .screen { width: 320px; height: 240px; transform: scale(.8); transform-origin: 0 0; background: #0b0d10; color: #f4d35e;
+  .screen-scale { width: 320px; height: 240px; overflow: hidden; flex: 0 0 auto; }
+  .screen { width: 320px; height: 240px; transform-origin: 0 0; background: #0b0d10; color: #f4d35e;
             font-family: "DejaVu Sans", "Inter", system-ui, sans-serif; position: relative; overflow: hidden; --m: #8b96a3; }
   .screen.dim { filter: brightness(.35); } .screen.off { filter: brightness(0); }
   .scr-head { height: 26px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px;
@@ -441,6 +441,17 @@ async function tech() {
       <td>${e.ok ? new Date(e.ok).toLocaleTimeString('de-DE') : '–'}</td><td>${e.departures}</td><td>${esc(e.error || '')}</td></tr>`).join('') + '</table>';
 }
 document.querySelector('details').addEventListener('toggle', tech);
+
+// Vorschau an die Kartenbreite anpassen (Originalgröße 320×240, nie größer)
+function fitScreen() {
+  const card = $('screen').closest('section');
+  const avail = card.clientWidth - 36 /* Padding */ - 24 /* Rahmen */ - 2 * 28 - 2 * 8 /* Tasterspalten */;
+  const k = Math.max(0.5, Math.min(1, avail / 320));
+  const box = $('screen').parentElement;
+  box.style.width = Math.floor(320 * k) + 'px'; box.style.height = Math.floor(240 * k) + 'px';
+  $('screen').style.transform = `scale(${k})`;
+}
+window.addEventListener('resize', fitScreen); fitScreen();
 
 poll(); loadTemplates(); loadSettings();
 setInterval(poll, 15000); setInterval(render, 1000); setInterval(loadTemplates, 30000); setInterval(tech, 15000);
