@@ -16,7 +16,7 @@ from pathlib import Path
 import httpx
 
 OUT = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
-CONTACT = os.environ.get("TRANSITOUS_CONTACT", "https://github.com/K4inx/abfahrtsanzeige")
+CONTACT = os.environ.get("TRANSITOUS_CONTACT", "https://github.com/K4inx/Mini-Haltestelle")
 
 
 def main() -> None:

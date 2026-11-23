@@ -217,7 +217,7 @@ class AppConfig(BaseModel):
 
 class Secrets(BaseModel):
     rmv_api_key: str | None = None
-    transitous_contact: str = "https://github.com/K4inx/abfahrtsanzeige"
+    transitous_contact: str = "https://github.com/K4inx/Mini-Haltestelle"
     notify_webhook_url: str | None = None
 
     @classmethod
