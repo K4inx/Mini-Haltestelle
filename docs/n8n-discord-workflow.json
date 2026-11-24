@@ -1,0 +1,39 @@
+{
+  "name": "Mini-Haltestelle → Discord",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mini-haltestelle",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1f0c0de-0001-4b1a-9c00-000000000001",
+      "name": "Webhook vom Server",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "a1f0c0de-0001-4b1a-9c00-0000000000aa"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "DISCORD_WEBHOOK_URL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ username: 'Mini-Haltestelle', content: '🚏 ' + $json.body.text }) }}",
+        "options": {}
+      },
+      "id": "a1f0c0de-0001-4b1a-9c00-000000000002",
+      "name": "An Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0]
+    }
+  ],
+  "connections": {
+    "Webhook vom Server": { "main": [[{ "node": "An Discord", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

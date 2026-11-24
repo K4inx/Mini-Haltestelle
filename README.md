@@ -20,7 +20,7 @@ brauchen kein Update am Gerät.
 |---|---|---|
 | `server/` | FastAPI-Backend, Poller, Web-UI, Docker | Phase 1 ✔ |
 | `client/` | Python-Client für den Pi, Mock-Fenster für den PC | Phase 2 ✔ (Mock), Hardware-Test offen |
-| `case/` | parametrisches OpenSCAD-Gehäuse | Phase 3 |
+| `case/` | parametrisches OpenSCAD-Gehäuse ([Anleitung](case/README.md)) | Phase 3: Entwurf, Maße des Display HAT noch nachmessen |
 | `docs/` | [API-Vertrag](docs/api-contract.md), [Pi einrichten](docs/pi-setup.md), [Mock unter Windows](docs/mock-windows.md) | |
 
 ## Funktionen (Server)
