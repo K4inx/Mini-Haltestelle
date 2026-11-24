@@ -4,10 +4,14 @@ Warum nicht Pimorons ``displayhatmini``-Bibliothek? Stand 11/2026 ist sie seit 2
 unverändert (0.0.2), nutzt ``RPi.GPIO`` und zieht per pip ``st7789`` 1.0.1 nach, das
 wiederum ``gpiod``/``gpiodevice`` und ``numpy>=1.26.4`` will — auf einem Pi Zero (ARMv6)
 heißt das im Zweifel stundenlanges Kompilieren. Dieser Treiber braucht nur Pakete aus apt:
-``python3-spidev``, ``python3-numpy``, ``python3-gpiozero``.
+``python3-spidev``, ``python3-numpy``, ``python3-lgpio``.
+
+GPIO bewusst direkt über ``lgpio`` statt gpiozero — am echten Zero gemessen (24.11.2026):
+gpiozero-Taster kosten dauerhaft ~12 % CPU (Überwachungs-Thread), eigenes Abfragen alle
+25 ms ~1,5 %. Software-PWM (lgpio) läuft nur, solange sie gebraucht wird.
 
 Pinbelegung (BCM, laut pinout.xyz und Pimoroni-Bibliothek):
-  SPI0 CE1 (spidev0.1), DC = GPIO 9, Backlight = GPIO 13 (PWM)
+  SPI0 CE1 (spidev0.1), DC = GPIO 9, Backlight = GPIO 13
   Taster A=5, B=6, X=16, Y=24 (gegen Masse, Pull-up)
   RGB-LED R=17, G=27, B=22 (active low)
 Init-Sequenz und Fensteradressierung wie in pimoroni/st7789-python.
@@ -15,6 +19,7 @@ Init-Sequenz und Fensteradressierung wie in pimoroni/st7789-python.
 
 from __future__ import annotations
 
+import threading
 import time
 
 from PIL import Image
@@ -25,6 +30,7 @@ PIN_DC = 9
 PIN_BACKLIGHT = 13
 PIN_BUTTONS = {"A": 5, "B": 6, "X": 16, "Y": 24}
 PIN_LED = (17, 27, 22)
+BUTTON_POLL_S = 0.025
 
 # ST7789-Befehle
 SWRESET, SLPOUT, INVON, DISPON = 0x01, 0x11, 0x21, 0x29
@@ -47,11 +53,12 @@ INIT = [
 
 
 def to_rgb565(img: Image.Image) -> bytes:
+    """RGB565 big-endian (gleiches Ergebnis wie ``render.rgb565``, für Vollbilder schneller)."""
     import numpy as np
 
     a = np.asarray(img.convert("RGB"), dtype=np.uint16)
     v = ((a[..., 0] & 0xF8) << 8) | ((a[..., 1] & 0xFC) << 3) | (a[..., 2] >> 3)
-    return v.astype(">u2").tobytes()  # gleiches Ergebnis wie render.rgb565, hier schneller für Vollbilder
+    return v.astype(">u2").tobytes()
 
 
 class HatDisplay(Display):
@@ -60,34 +67,62 @@ class HatDisplay(Display):
     def __init__(self, rotation: int = 180, spi_hz: int = 60_000_000):
         """``rotation=180`` entspricht der Montage, wie Pimoroni sie vorsieht (Taster links/rechts)."""
         super().__init__()
+        import lgpio
         import spidev
-        from gpiozero import RGBLED, Button, DigitalOutputDevice, PWMOutputDevice
 
+        self.lg = lgpio
         self.rotation = rotation % 360
         self._dc_state: bool | None = None
         self._win: tuple[int, int, int, int] | None = None
+        self._bl_set = False
+
         self.spi = spidev.SpiDev()
         self.spi.open(0, 1)
         self.spi.max_speed_hz = spi_hz
         self.spi.mode = 0
-        self.dc = DigitalOutputDevice(PIN_DC)
-        self.bl = PWMOutputDevice(PIN_BACKLIGHT, frequency=500, initial_value=0)
-        self.rgb = RGBLED(*PIN_LED, active_high=False, pwm=True)
-        self.buttons = []
-        for name, pin in PIN_BUTTONS.items():
-            b = Button(pin, pull_up=True, bounce_time=0.02)
-            b.when_pressed = lambda n=name: self.emit(n, True)
-            b.when_released = lambda n=name: self.emit(n, False)
-            self.buttons.append(b)
+
+        self.h = lgpio.gpiochip_open(0)
+        lgpio.gpio_claim_output(self.h, PIN_DC, 0)
+        lgpio.gpio_claim_output(self.h, PIN_BACKLIGHT, 0)
+        for pin in PIN_LED:
+            lgpio.gpio_claim_output(self.h, pin, 1)  # active low → 1 = aus
+        for pin in PIN_BUTTONS.values():
+            lgpio.gpio_claim_input(self.h, pin, lgpio.SET_PULL_UP)
+
+        self._stop = threading.Event()
+        threading.Thread(target=self._poll_buttons, name="buttons", daemon=True).start()
         self._init_panel()
 
-    # --- SPI --------------------------------------------------------------
+    # --- GPIO -------------------------------------------------------------
     def _set_dc(self, data: bool) -> None:
-        # gpiozero-Aufrufe sind auf dem Zero teuer (~0,5 ms) — nur bei echtem Wechsel
-        if self._dc_state is not data:
-            (self.dc.on if data else self.dc.off)()
+        if self._dc_state is not data:  # nur bei echtem Wechsel
+            self.lg.gpio_write(self.h, PIN_DC, 1 if data else 0)
             self._dc_state = data
 
+    def _poll_buttons(self) -> None:
+        """Alle 25 ms lesen; ein Zustand gilt, wenn er zweimal hintereinander gleich ist (Entprellen)."""
+        names = list(PIN_BUTTONS)
+        stable = dict.fromkeys(names, False)
+        last = dict.fromkeys(names, False)
+        while not self._stop.is_set():
+            for n in names:
+                pressed = self.lg.gpio_read(self.h, PIN_BUTTONS[n]) == 0  # Taster ziehen nach Masse
+                if pressed == last[n] and pressed != stable[n]:
+                    stable[n] = pressed
+                    self.emit(n, pressed)
+                last[n] = pressed
+            time.sleep(BUTTON_POLL_S)
+
+    def _pwm(self, pin: int, level: float, active_low: bool = False, freq: int = 500) -> None:
+        """0 % und 100 % digital (keine Software-PWM), dazwischen lgpio-PWM."""
+        on = 1 - level if active_low else level
+        if on <= 0.005 or on >= 0.995:
+            self.lg.tx_pwm(self.h, pin, 0, 0)
+            self.lg.gpio_write(self.h, pin, 1 if on >= 0.995 else 0)
+        else:
+            self.lg.tx_pwm(self.h, pin, freq, round(on * 100, 1))
+
+    # --- SPI --------------------------------------------------------------
     def _cmd(self, c: int, data: list[int] | bytes | None = None) -> None:
         self._set_dc(False)
         self.spi.writebytes([c])
@@ -106,7 +141,7 @@ class HatDisplay(Display):
         time.sleep(0.1)
 
     def _window(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """Fenster inklusive x0..x1-1 / y0..y1-1. Gleiches Fenster → nur RAMWR (Schreibzeiger auf Anfang)."""
+        """Fenster inkl. x0..x1-1 / y0..y1-1. Gleiches Fenster → nur RAMWR (Schreibzeiger auf Anfang)."""
         if self._win == (x0, y0, x1, y1):
             self._cmd(RAMWR)
             return
@@ -115,21 +150,23 @@ class HatDisplay(Display):
         self._cmd(RASET, [y0 >> 8, y0 & 0xFF, (y1 - 1) >> 8, (y1 - 1) & 0xFF])
         self._cmd(RAMWR)
 
-    def _push(self, img: Image.Image, box: tuple[int, int, int, int]) -> None:
+    def _rotate_box(self, box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         x0, y0, x1, y1 = box
         if self.rotation == 180:
+            return self.width - x1, self.height - y1, self.width - x0, self.height - y0
+        return box
+
+    def _push(self, img: Image.Image, box: tuple[int, int, int, int]) -> None:
+        if self.rotation == 180:
             img = img.rotate(180)
-            x0, y0, x1, y1 = self.width - x1, self.height - y1, self.width - x0, self.height - y0
-        self._window(x0, y0, x1, y1)
+        self._window(*self._rotate_box(box))
         self._set_dc(True)
         self.spi.writebytes2(to_rgb565(img))
 
     def push_raw(self, data: bytes, box: tuple[int, int, int, int]) -> None:
-        x0, y0, x1, y1 = box
-        if self.rotation == 180:  # 180°: Pixelreihenfolge umdrehen, Bytes je Pixel bleiben
+        if self.rotation == 180:  # Pixelreihenfolge umdrehen, die zwei Bytes je Pixel bleiben
             data = memoryview(data).cast("H")[::-1].tobytes()
-            x0, y0, x1, y1 = self.width - x1, self.height - y1, self.width - x0, self.height - y0
-        self._window(x0, y0, x1, y1)
+        self._window(*self._rotate_box(box))
         self._set_dc(True)
         self.spi.writebytes2(data)
 
@@ -137,15 +174,19 @@ class HatDisplay(Display):
     def set_backlight(self, value: float) -> None:
         old = self.backlight
         super().set_backlight(value)
-        if self.backlight != old or self.bl.value != self.backlight:
-            self.bl.value = self.backlight
+        if self.backlight != old or not self._bl_set:
+            self._pwm(PIN_BACKLIGHT, self.backlight)
+            self._bl_set = True
 
     def set_led(self, r: float, g: float, b: float) -> None:
         if (r, g, b) != self.led:
             super().set_led(r, g, b)
-            self.rgb.color = (r, g, b)
+            for pin, v in zip(PIN_LED, (r, g, b), strict=True):
+                self._pwm(pin, v, active_low=True, freq=2000)
 
     def close(self) -> None:
+        self._stop.set()
         self.set_led(0, 0, 0)
         self.set_backlight(0)
         self.spi.close()
+        self.lg.gpiochip_close(self.h)

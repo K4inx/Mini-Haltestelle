@@ -53,8 +53,8 @@ sudo reboot                                 # nur beim ersten Mal (SPI)
 `install.sh` macht Folgendes:
 
 - schaltet SPI ein
-- installiert alle Pakete per **apt**: `python3-pil`, `-numpy`, `-spidev`, `-gpiozero`,
-  `-lgpio`, `-requests`, `-yaml`. Auf dem Zero wird nichts kompiliert.
+- installiert alle Pakete per **apt**: `python3-pil`, `-numpy`, `-spidev`, `-lgpio`,
+  `-requests`, `-yaml`. Auf dem Zero wird nichts kompiliert.
 - legt ein venv mit `--system-site-packages` und den Benutzer `haltestelle` an
 - legt die Config `/etc/abfahrtsanzeige/client.yaml` an
 - richtet den systemd-Dienst `mini-haltestelle` mit `Restart=always` ein
@@ -119,5 +119,5 @@ kein Update am Pi.
 | Bild steht auf dem Kopf | in `client.yaml` `rotation: 180` |
 | Dauerhaft „verbinde …" | Darunter steht der Grund. Server-URL in `client.yaml` prüfen, dann `curl http://<server>:8080/healthz` vom Pi aus |
 | Log: `PinPWMUnsupported: PWM is not supported on pin GPIO13` | `lgpio` kann sein Arbeitsverzeichnis nicht beschreiben → `install.sh` erneut laufen lassen (setzt `LG_WD`) |
-| Taster reagieren nicht, Log meldet `lgpio`/`pin factory` | `sudo apt-get install python3-lgpio`, Dienst neu starten |
+| Taster reagieren nicht, Log meldet `lgpio` | `sudo apt-get install python3-lgpio`, Dienst neu starten |
 | Sehr träge | `htop`: Der Client sollte unter 15 % CPU liegen. Sonst Log prüfen. |

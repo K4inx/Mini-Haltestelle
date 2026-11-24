@@ -23,9 +23,7 @@ echo "== Pakete aus apt (nichts muss auf dem Zero kompiliert werden)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq git python3-venv python3-pil python3-numpy python3-spidev \
-  python3-gpiozero python3-requests python3-yaml >/dev/null
-# lgpio ist gpiozeros Standard-Backend auf aktuellem Raspberry Pi OS; fehlt es, nimmt gpiozero RPi.GPIO
-apt-get install -y -qq python3-lgpio >/dev/null 2>&1 || echo "   python3-lgpio nicht verfügbar — gpiozero nutzt ein anderes Backend"
+  python3-lgpio python3-requests python3-yaml >/dev/null
 
 echo "== venv mit System-Paketen: $VENV"
 [ -d "$VENV" ] || python3 -m venv --system-site-packages "$VENV"
