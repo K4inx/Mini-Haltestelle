@@ -2,7 +2,7 @@
 #   make stl   alle Teile als STL nach stl/
 #   make png   Vorschaubilder nach vorschau/ (braucht xvfb-run auf Servern ohne Bildschirm)
 SCAD := mini-haltestelle.scad
-PARTS := front back mast mast_oben fuss schild schild_h lichtleiter
+PARTS := front back lichtleiter
 OPENSCAD ?= openscad
 XVFB := $(shell command -v xvfb-run >/dev/null && echo "xvfb-run -a")
 
@@ -15,9 +15,9 @@ stl/%.stl: $(SCAD)
 
 png: $(SCAD)
 	@mkdir -p vorschau
-	$(XVFB) $(OPENSCAD) -q -D 'part="alle"' --imgsize=700,900 --camera=0,330,40,0,0,40 --viewall --autocenter --colorscheme=Tomorrow -o vorschau/vorn.png $<
-	$(XVFB) $(OPENSCAD) -q -D 'part="alle"' --imgsize=900,1300 --camera=110,330,90,0,0,0 --viewall --autocenter --colorscheme=Tomorrow -o vorschau/schraeg.png $<
-	$(XVFB) $(OPENSCAD) -q -D 'part="explosion"' --imgsize=900,1300 --camera=260,260,120,0,0,0 --viewall --autocenter --colorscheme=Tomorrow -o vorschau/explosion.png $<
+	$(XVFB) $(OPENSCAD) -q -D 'part="alle"' --imgsize=900,700 --camera=90,320,120,0,0,25 --viewall --autocenter --colorscheme=Tomorrow -o vorschau/vorn.png $<
+	$(XVFB) $(OPENSCAD) -q -D 'part="alle"' --imgsize=900,700 --camera=-120,-300,140,0,0,25 --viewall --autocenter --colorscheme=Tomorrow -o vorschau/hinten.png $<
+	$(XVFB) $(OPENSCAD) -q -D 'part="alle"' --imgsize=700,600 --camera=350,0,30,0,0,25 --viewall --autocenter --colorscheme=Tomorrow -o vorschau/seite.png $<
 	$(XVFB) $(OPENSCAD) -q -D 'part="front"' --imgsize=900,700 --camera=0,0,0,180,0,0,170 --viewall --autocenter --colorscheme=Tomorrow -o vorschau/front-innen.png $<
 
 clean:

@@ -1,10 +1,11 @@
 # Gehäuse: Mini-Haltestelle
 
-Parametrisches OpenSCAD-Modell. Von unten nach oben: Standfuß, Mast, Gehäuse mit Display,
-kurzer Mast, Haltestellenschild (grüner Kreis, gelbes „H"). Keine Logos von
-Verkehrsunternehmen.
+Parametrisches OpenSCAD-Modell eines schlichten Kastens für den Schreibtisch. Er steht um
+10° nach hinten geneigt auf einem schmalen Keil-Sockel. Einzige Anspielung auf die
+Haltestelle ist ein kleines rundes Schild oben rechts mit vertieftem „H", in derselben
+Farbe wie der Rest. Keine Logos von Verkehrsunternehmen.
 
-![Ansicht von vorn](vorschau/vorn.png) ![Explosionsansicht](vorschau/explosion.png)
+![Ansicht von vorn](vorschau/vorn.png) ![Rückseite](vorschau/hinten.png) ![Seite](vorschau/seite.png)
 
 ```bash
 make stl     # alle Teile nach stl/
@@ -19,22 +20,16 @@ openscad -D 'part="front"' -o front.stl mini-haltestelle.scad   # ein einzelnes 
 
 ## Teile
 
-| Teil | `part=` | Farbe | Lage im Drucker | Hinweise |
-|---|---|---|---|---|
-| Vorderteil | `front` | hellgrau/weiß | Vorderseite aufs Bett | keine Stützen nötig: Fenster mit Fase, Mastbohrungen als Tropfenform |
-| Deckel | `back` | hellgrau | Außenseite aufs Bett | Lüftungsschlitze, 4 Stützen zum Pi |
-| Mast | `mast` | grau | stehend | 100 % Füllung oder 4 Wände, sonst wackelig |
-| Mast oben | `mast_oben` | grau | stehend | |
-| Standfuß | `fuss` | dunkelgrau | flach | Mulde unten für Gewicht oder Filzgleiter |
-| Schild | `schild` | **grün** | flach | „H" ist vertieft |
-| H | `schild_h` | **gelb** | flach | in die Vertiefung kleben oder pressen (0,15 mm Spiel) |
-| Lichtleiter | `lichtleiter` | klar/natur (PETG) | stehend | optional, leitet die RGB-LED nach vorn |
+| Teil | `part=` | Lage im Drucker | Hinweise |
+|---|---|---|---|
+| Vorderteil mit Sockel und Schild | `front` | Vorderseite aufs Bett | keine Stützen nötig: Fenster mit Fase, das „H" ist eine Vertiefung in der ersten Schicht |
+| Deckel | `back` | Außenseite aufs Bett | Lüftungsschlitze, Kabelkerbe, 4 Stützen zum Pi |
+| Lichtleiter | `lichtleiter` | stehend | optional, klares/naturfarbenes PETG, leitet die RGB-LED nach vorn |
 
-Alternativ druckt man Schild und H in einem Teil mit Farbwechsel per Pause (M600) bei der
-Schichthöhe `sign_t − h_inlay`.
-
-Empfehlung PLA, 0,2 mm Schichthöhe, 3 Wände. Die Taster-Zungen im Vorderteil federn nur,
-wenn die Frontplatte nicht zu dick ist (`front_t` = 1,6 mm).
+Einfarbig drucken, z. B. anthrazit oder weiß. Empfehlung PLA, 0,2 mm Schichthöhe,
+3 Wände. Damit das „H" sauber wird, die erste Schicht nicht zu stark andrücken
+(Elephant's Foot schließt die 0,6-mm-Vertiefung sonst teilweise). Die Taster-Zungen federn
+nur, wenn die Frontplatte dünn bleibt (`front_t` = 1,6 mm).
 
 ## Material
 
@@ -43,19 +38,25 @@ wenn die Frontplatte nicht zu dick ist (`front_t` = 1,6 mm).
 | Pi Zero W + Display HAT Mini mit den beiliegenden 10-mm-Abstandshaltern | 1 |
 | M2 × 6 Blechschraube (Deckel) | 2 |
 | M2,5 × 8 Schraube (Deckel → Abstandshalter, ersetzt die kurzen Schrauben unter dem Zero) | 4 |
-| Micro-USB-Kabel mit **gewinkeltem** Stecker (passt besser durch die Aussparung) | 1 |
+| Micro-USB-Kabel mit **gewinkeltem** Stecker. Der Stecker muss nach hinten zeigen, wenn er von unten in der Buchse steckt. | 1 |
 
 ## Montage
 
 1. Display HAT und Zero wie vorgesehen mit den Abstandshaltern verschrauben, aber die vier
    Schrauben **unter** dem Zero weglassen.
-2. Stapel mit dem Display nach vorn ins Vorderteil legen. Das Glas liegt innen an der
+2. Gewinkeltes USB-Kabel einstecken, der Stecker zeigt nach hinten.
+3. Stapel mit dem Display nach vorn ins Vorderteil legen. Das Glas liegt innen an der
    Frontplatte, die Noppen der Zungen sitzen über den Tastern.
-3. Deckel aufsetzen, die vier M2,5-Schrauben durch die Stützen in die Abstandshalter
-   drehen. Danach die zwei M2-Schrauben in die Dome.
-4. Masten einstecken, Fuß und Schild aufstecken. Wenn es zu stramm sitzt, `peg_clr`
-   erhöhen. Wenn es wackelt, verringern oder einen Tropfen Kleber nehmen.
-5. Kabel an der Aussparung unten rechts einstecken und hinter dem Mast herunterführen.
+4. Deckel aufsetzen, Kabel durch die Kerbe unten führen. Die vier M2,5-Schrauben durch die
+   Stützen in die Abstandshalter drehen, dann die zwei M2-Schrauben in die Dome.
+
+## Anpassen
+
+| Variable | Wirkung |
+|---|---|
+| `tilt` | Neigung nach hinten. Mehr Neigung braucht mehr `base_h`, sonst läuft der Keil zu früh aus. |
+| `base_h`, `base_ext`, `base_inset` | Sockelhöhe vorn, Überstand hinten (gegen Kippen beim Drücken), seitlicher Einzug |
+| `sign_d`, `sign_rise`, `sign_inset`, `h_depth` | Größe und Lage des Schilds, Tiefe des „H" |
 
 ## Vor dem ersten Druck nachmessen
 
@@ -69,5 +70,9 @@ wenn die Frontplatte nicht zu dick ist (`front_t` = 1,6 mm).
 | `stack_h` | Unterseite Zero bis Glasoberkante | 17 |
 | `usb_pwr_x`, `sd_y` | Lage von Micro-USB und microSD am Zero (offiziell) | 54 / 16,9 |
 
-Messen geht am einfachsten so: Display HAT flach hinlegen, alle Maße von der **linken
-unteren Ecke** nehmen und dann in Mittenwerte umrechnen (Mitte = halbe Breite/Höhe).
+Koordinaten: `x` negativ ist **von vorn gesehen links**, Ursprung in der Mitte der Platinen.
+Am einfachsten das Display HAT flach hinlegen, alle Maße von der linken unteren Ecke
+nehmen und dann in Mittenwerte umrechnen (Mitte = halbe Breite bzw. Höhe).
+
+Die erste Fassung mit Mast, Standfuß und großem farbigem Schild liegt in der Git-Historie
+(Commit „Gehäuse-Entwurf (Phase 3)").
