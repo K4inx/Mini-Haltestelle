@@ -112,8 +112,10 @@ class HatDisplay(Display):
 
     # --- Licht -----------------------------------------------------------
     def set_backlight(self, value: float) -> None:
+        old = self.backlight
         super().set_backlight(value)
-        self.bl.value = self.backlight
+        if self.backlight != old or self.bl.value != self.backlight:
+            self.bl.value = self.backlight
 
     def set_led(self, r: float, g: float, b: float) -> None:
         if (r, g, b) != self.led:

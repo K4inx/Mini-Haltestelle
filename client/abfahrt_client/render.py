@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 from .model import Board, Row
 
@@ -65,7 +65,54 @@ THEMES = {
 
 @lru_cache(maxsize=32)
 def font(weight: str, size: int) -> ImageFont.FreeTypeFont:
-    return ImageFont.truetype(str(FONT_DIR / f"Inter-{weight}.ttf"), size)
+    # BASIC statt Raqm: für lateinische Schrift gleich, aber spürbar schneller
+    return ImageFont.truetype(str(FONT_DIR / f"Inter-{weight}.ttf"), size, layout_engine=ImageFont.Layout.BASIC)
+
+
+# --------------------------------------------------------------------------- #
+# Text-Zwischenspeicher
+#
+# Auf dem Pi Zero kostet jedes ``draw.text`` 20–40 ms (FreeType-Rendering), ``getlength``
+# ~3 ms. Fast alle Texte wiederholen sich aber (Ziele, Linien, Quelle, Minutenwerte).
+# Deshalb wird jeder Text einmal als Graustufen-Maske gerendert und danach nur noch
+# eingefärbt aufgeklebt (``Image.paste`` mit Maske — reines C, < 1 ms).
+# --------------------------------------------------------------------------- #
+
+
+@lru_cache(maxsize=2048)
+def tlen(f: ImageFont.FreeTypeFont, text: str) -> float:
+    return f.getlength(text)
+
+
+@lru_cache(maxsize=1024)
+def _glyphs(text: str, f: ImageFont.FreeTypeFont, anchor: str) -> tuple[Image.Image | None, int, int]:
+    x0, y0, x1, y1 = f.getbbox(text, anchor=anchor)
+    if x1 <= x0 or y1 <= y0:
+        return None, 0, 0
+    m = Image.new("L", (x1 - x0, y1 - y0), 0)
+    ImageDraw.Draw(m).text((-x0, -y0), text, font=f, fill=255, anchor=anchor)
+    return m, x0, y0
+
+
+@lru_cache(maxsize=64)
+def _rgb(color: str) -> tuple[int, int, int]:
+    return ImageColor.getrgb(color)[:3]
+
+
+class CachedDraw:
+    """Wie ``ImageDraw.Draw``, aber ``text`` nutzt den Masken-Zwischenspeicher."""
+
+    def __init__(self, img: Image.Image):
+        self.img = img
+        self._d = ImageDraw.Draw(img)
+
+    def __getattr__(self, name: str):
+        return getattr(self._d, name)
+
+    def text(self, xy, text: str, font: ImageFont.FreeTypeFont, fill: str, anchor: str = "la") -> None:
+        m, x0, y0 = _glyphs(text, font, anchor)
+        if m is not None:
+            self.img.paste(_rgb(fill), (round(xy[0]) + x0, round(xy[1]) + y0), m)
 
 
 F_HEAD = ("SemiBold", 16)
@@ -82,20 +129,20 @@ def hhmm(t: datetime) -> str:
 
 
 def ellipsize(text: str, f: ImageFont.FreeTypeFont, max_w: float) -> str:
-    if f.getlength(text) <= max_w:
+    if tlen(f, text) <= max_w:
         return text
-    while text and f.getlength(text + "…") > max_w:
+    while text and tlen(f, text + "…") > max_w:
         text = text[:-1]
     return text.rstrip() + "…"
 
 
 def fit_keep_tail(text: str, f: ImageFont.FreeTypeFont, max_w: float, sep: str = " ca. ") -> str:
     """Wie ``ellipsize``, kürzt aber den Teil vor ``sep`` — die Uhrzeit dahinter bleibt stehen."""
-    if f.getlength(text) <= max_w or sep not in text:
+    if tlen(f, text) <= max_w or sep not in text:
         return ellipsize(text, f, max_w)
     head, _, tail = text.rpartition(sep)
     tail = sep + tail
-    return ellipsize(head, f, max_w - f.getlength(tail)) + tail
+    return ellipsize(head, f, max_w - tlen(f, tail)) + tail
 
 
 def minutes_label(row: Row, now: datetime) -> str:
@@ -118,9 +165,9 @@ class Renderer:
         if self._strip_cache and self._strip_cache[:2] == (text, height):
             return self._strip_cache[2], self._strip_cache[3]
         ff = font(*F_FOOT)
-        period = int(ff.getlength(text)) + 40
+        period = int(tlen(ff, text)) + 40
         img = Image.new("RGB", (2 * period + W, height), self.t.bg)
-        d = ImageDraw.Draw(img)
+        d = CachedDraw(img)
         for k in range(3):
             d.text((8 + k * period, cy), text, font=ff, fill=self.t.muted, anchor="lm")
         self._strip_cache = (text, height, img, period)
@@ -130,20 +177,20 @@ class Renderer:
     # Bausteine
     # ------------------------------------------------------------------ #
 
-    def _canvas(self) -> tuple[Image.Image, ImageDraw.ImageDraw]:
+    def _canvas(self) -> tuple[Image.Image, CachedDraw]:
         img = Image.new("RGB", (W, H), self.t.bg)
-        return img, ImageDraw.Draw(img)
+        return img, CachedDraw(img)
 
-    def _header(self, d: ImageDraw.ImageDraw, title: str, now: datetime, bell: datetime | None = None) -> None:
+    def _header(self, d: CachedDraw, title: str, now: datetime, bell: datetime | None = None) -> None:
         clock = now.strftime("%H:%M")
         fc = font(*F_CLOCK)
-        cw = fc.getlength(clock)
+        cw = tlen(fc, clock)
         right = W - 8 - cw
         d.text((W - 8, HEAD_H // 2), clock, font=fc, fill=self.t.head, anchor="rm")
         if bell is not None:
             fb = font("SemiBold", 13)
             txt = hhmm(bell)
-            tw = fb.getlength(txt)
+            tw = tlen(fb, txt)
             x = right - 10 - tw
             d.text((x, HEAD_H // 2), txt, font=fb, fill=self.t.bell, anchor="lm")
             self._bell(d, x - 16, 7, self.t.bell)
@@ -153,7 +200,7 @@ class Renderer:
         d.line((0, HEAD_H - 1, W, HEAD_H - 1), fill=self.t.rule)
 
     @staticmethod
-    def _bell(d: ImageDraw.ImageDraw, x: int, y: int, color: str) -> None:
+    def _bell(d: CachedDraw, x: int, y: int, color: str) -> None:
         """Kleine Glocke (12×14) — Emoji gibt es in der Schrift nicht."""
         d.pieslice((x + 1, y, x + 11, y + 10), 180, 360, fill=color)
         d.rectangle((x + 1, y + 5, x + 11, y + 10), fill=color)
@@ -162,7 +209,7 @@ class Renderer:
 
     def _badge(
         self,
-        d: ImageDraw.ImageDraw,
+        d: CachedDraw,
         x: int,
         cy: int,
         row_line: str,
@@ -172,7 +219,7 @@ class Renderer:
         f: ImageFont.FreeTypeFont | None = None,
     ) -> int:
         f = f or font(*F_BADGE)
-        w = max(size[0], int(f.getlength(row_line)) + 10)
+        w = max(size[0], int(tlen(f, row_line)) + 10)
         h = size[1]
         box = (x, cy - h // 2, x + w, cy + h // 2)
         radius = h // 2 if product == "S" else 4  # S-Bahn rund, wie am Bahnsteig
@@ -200,13 +247,13 @@ class Renderer:
 
     def footer(self, board: Board | None, now: datetime, view: str, offset: int = 0) -> Image.Image:
         img = Image.new("RGB", (W, H - FOOT_Y), self.t.bg)
-        d = ImageDraw.Draw(img)
+        d = CachedDraw(img)
         d.line((0, 0, W, 0), fill=self.t.rule)
         if board is None:
             return img
         fs = font(*F_SRC)
         src = board.source
-        sw = int(fs.getlength(src)) + 8 if src else 0
+        sw = int(tlen(fs, src)) + 8 if src else 0
         cy = (H - FOOT_Y) // 2 + 1
         text, scrolling = self.footer_text(board, now, view)
         ff = font(*F_FOOT)
@@ -215,7 +262,7 @@ class Renderer:
             mins = max(1, int((now - board.stale_since).total_seconds() // 60))
             tag = f"offline seit {mins} min"
             fo = font("SemiBold", 12)
-            tw = fo.getlength(tag) + 12
+            tw = tlen(fo, tag) + 12
             d.rounded_rectangle((5, 4, 5 + tw, H - FOOT_Y - 4), radius=3, fill="#b3261e")
             d.text((5 + tw / 2, cy), tag, font=fo, fill="#ffffff", anchor="mm")
         elif scrolling:
@@ -251,14 +298,14 @@ class Renderer:
                 d.rectangle((0, y0, W, y0 + ROW_H - 1), fill=self.t.highlight)
             bw = self._badge(d, 6, cy, r.line, r.product, r.color)
             label = "fällt aus" if r.cancelled else minutes_label(r, now)
-            mw = fm.getlength(label)
+            mw = tlen(fm, label)
             color = self.t.muted if r.cancelled else self._late_color(r.delay_min)
             d.text((W - 7, cy), label, font=fm, fill=color, anchor="rm")
             x = 6 + bw + 8
             text = ellipsize(r.direction, fd, W - 7 - mw - 8 - x)
             d.text((x, cy), text, font=fd, fill=self.t.muted if r.cancelled else self.t.ink, anchor="lm")
             if r.cancelled:
-                tw = fd.getlength(text)
+                tw = tlen(fd, text)
                 d.line((x, cy, x + tw, cy), fill=self.t.muted, width=2)
         img.paste(self.footer(board, now, "list", footer_offset), (0, FOOT_Y))
         return img
@@ -295,11 +342,11 @@ class Renderer:
             fbig = font("Bold", 38)
             d.text((10, y), big, font=fbig, fill=self._late_color(r.delay_min), anchor="lm")
             t = ("" if r.realtime else "~") + hhmm(r.departure)
-            fx = 10 + fbig.getlength(big) + 14
+            fx = 10 + tlen(fbig, big) + 14
             d.text((fx, y + 4), t, font=font("SemiBold", 18), fill=self.t.ink, anchor="lm")
             if r.delay_min > 0:
                 d.text(
-                    (fx + font("SemiBold", 18).getlength(t) + 6, y + 4),
+                    (fx + tlen(font("SemiBold", 18), t) + 6, y + 4),
                     f"+{r.delay_min}",
                     font=font("SemiBold", 18),
                     fill=self._late_color(r.delay_min),
@@ -327,9 +374,9 @@ class Renderer:
         return img
 
     def _kv(
-        self, d: ImageDraw.ImageDraw, y: int, k: str, v: str, fk: ImageFont.FreeTypeFont, fv: ImageFont.FreeTypeFont
+        self, d: CachedDraw, y: int, k: str, v: str, fk: ImageFont.FreeTypeFont, fv: ImageFont.FreeTypeFont
     ) -> None:
-        vw = fv.getlength(v)
+        vw = tlen(fv, v)
         d.text((10, y), ellipsize(k, fk, W - 30 - vw), font=fk, fill=self.t.muted, anchor="lm")
         d.text((W - 10, y), v, font=fv, fill=self.t.ink, anchor="rm")
 
@@ -365,7 +412,7 @@ def _wrap(text: str, f: ImageFont.FreeTypeFont, max_w: float) -> list[str]:
     cur = ""
     for word in text.split():
         trial = f"{cur} {word}".strip()
-        if f.getlength(trial) <= max_w:
+        if tlen(f, trial) <= max_w:
             cur = trial
         else:
             if cur:
