@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 LED_COLORS = {"ideal": (0.0, 1.0, 0.0), "hurry": (1.0, 0.45, 0.0)}
 MARQUEE_PX_PER_S = 30
-TICK_MARQUEE = 0.1
+TICK_MARQUEE = 0.15  # ~7 Bilder/s: auf dem Zero ein guter Kompromiss aus Ruhe und CPU
 TICK_IDLE = 0.25
 
 

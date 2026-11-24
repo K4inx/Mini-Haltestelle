@@ -245,10 +245,19 @@ class Renderer:
                 return f"Ankunft{dest} ca. {hhmm(r.arrival)}", False
         return "", False
 
-    def footer(self, board: Board | None, now: datetime, view: str, offset: int = 0) -> Image.Image:
+    @lru_cache(maxsize=8)  # noqa: B019 — wenige Renderer, Lebensdauer = Programm
+    def _footer_base(self, src: str) -> Image.Image:
+        """Leere Fußzeile mit Trennlinie und Quellenangabe — einmal gezeichnet, dann kopiert."""
         img = Image.new("RGB", (W, H - FOOT_Y), self.t.bg)
         d = CachedDraw(img)
         d.line((0, 0, W, 0), fill=self.t.rule)
+        if src:
+            d.text((W - 6, (H - FOOT_Y) // 2 + 1), src, font=font(*F_SRC), fill=self.t.muted, anchor="rm")
+        return img
+
+    def footer(self, board: Board | None, now: datetime, view: str, offset: int = 0) -> Image.Image:
+        img = self._footer_base(board.source if board else "").copy()
+        d = CachedDraw(img)
         if board is None:
             return img
         fs = font(*F_SRC)
@@ -271,8 +280,6 @@ class Renderer:
             img.paste(strip.crop((x, 0, x + area_w, strip.height)), (0, 1))
         elif text:
             d.text((8, cy), fit_keep_tail(text, ff, area_w - 8), font=ff, fill=self.t.muted, anchor="lm")
-        if src:
-            d.text((W - 6, cy), src, font=fs, fill=self.t.muted, anchor="rm")
         return img
 
     @staticmethod
