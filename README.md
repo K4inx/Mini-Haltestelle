@@ -74,7 +74,7 @@ Auf dem Pi (Raspberry Pi OS Lite 32-bit, Legacy/Bookworm). Alles kommt aus apt, 
 
 ```bash
 sudo git clone https://github.com/K4inx/Mini-Haltestelle.git /opt/mini-haltestelle
-sudo /opt/mini-haltestelle/client/install.sh
+sudo /opt/mini-haltestelle/client/install.sh http://<server-ip>:8080
 ```
 
 Komplette Anleitung inklusive Löten und SD-Karte: [docs/pi-setup.md](docs/pi-setup.md).

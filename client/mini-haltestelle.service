@@ -12,6 +12,11 @@ ExecStart=@VENV@/bin/python -m abfahrt_client
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+# lgpio legt Hilfsdateien im Arbeitsverzeichnis an; der Repo-Ordner gehört root.
+# Ohne beschreibbares LG_WD fällt gpiozero auf ein Backend ohne PWM zurück
+# (PinPWMUnsupported auf GPIO13) — gefunden am ersten echten Gerät.
+RuntimeDirectory=mini-haltestelle
+Environment=LG_WD=/run/mini-haltestelle
 # Wenig RAM auf dem Zero: klar begrenzen, statt das System auszubremsen
 MemoryMax=150M
 Nice=5

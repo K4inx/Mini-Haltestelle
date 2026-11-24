@@ -46,7 +46,7 @@ IPv4-Adresse zuweisen" anhaken.
 ssh <benutzer>@mini-haltestelle.local      # oder die IP aus der Fritzbox
 sudo apt-get update && sudo apt-get install -y git
 sudo git clone https://github.com/K4inx/Mini-Haltestelle.git /opt/mini-haltestelle
-sudo /opt/mini-haltestelle/client/install.sh
+sudo /opt/mini-haltestelle/client/install.sh http://<server-ip>:8080
 sudo reboot                                 # nur beim ersten Mal (SPI)
 ```
 
@@ -117,6 +117,7 @@ kein Update am Pi.
 | Display bleibt weiß oder schwarz, Log zeigt `spidev`-Fehler | SPI aus → `sudo raspi-config nonint do_spi 0`, Neustart |
 | `Permission denied: /dev/spidev0.1` oder `gpiochip` | Benutzer nicht in `spi`/`gpio` → `install.sh` erneut laufen lassen |
 | Bild steht auf dem Kopf | in `client.yaml` `rotation: 180` |
-| Dauerhaft „verbinde …" | Server-URL prüfen: `curl http://<server>:8080/healthz` vom Pi aus |
+| Dauerhaft „verbinde …" | Darunter steht der Grund. Server-URL in `client.yaml` prüfen, dann `curl http://<server>:8080/healthz` vom Pi aus |
+| Log: `PinPWMUnsupported: PWM is not supported on pin GPIO13` | `lgpio` kann sein Arbeitsverzeichnis nicht beschreiben → `install.sh` erneut laufen lassen (setzt `LG_WD`) |
 | Taster reagieren nicht, Log meldet `lgpio`/`pin factory` | `sudo apt-get install python3-lgpio`, Dienst neu starten |
 | Sehr träge | `htop`: Der Client sollte unter 15 % CPU liegen. Sonst Log prüfen. |

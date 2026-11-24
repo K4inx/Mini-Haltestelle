@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Mini-Haltestelle — Client auf dem Pi einrichten (Raspberry Pi OS Lite 32-bit, Bookworm).
-#   sudo /opt/mini-haltestelle/client/install.sh
+#   sudo /opt/mini-haltestelle/client/install.sh http://<server-ip>:8080
 # Idempotent: darf nach Updates erneut laufen.
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "Bitte mit sudo ausführen."; exit 1; }
 CLIENT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$CLIENT_DIR")"
+SERVER_URL="${1:-}"
 APP_USER=haltestelle
 CONF_DIR=/etc/abfahrtsanzeige
 VENV=/opt/mini-haltestelle-venv
@@ -36,6 +37,9 @@ usermod -aG spi,gpio "$APP_USER"
 echo "== Konfiguration $CONF_DIR/client.yaml"
 install -d -m 755 "$CONF_DIR"
 [ -f "$CONF_DIR/client.yaml" ] || install -m 644 "$CLIENT_DIR/client.example.yaml" "$CONF_DIR/client.yaml"
+if [ -n "$SERVER_URL" ]; then
+  sed -i "s|^server_url:.*|server_url: \"${SERVER_URL%/}\"|" "$CONF_DIR/client.yaml"
+fi
 
 echo "== systemd-Dienst"
 sed -e "s|@CLIENT_DIR@|$CLIENT_DIR|g" -e "s|@VENV@|$VENV|g" -e "s|@USER@|$APP_USER|g" \
@@ -45,6 +49,10 @@ systemctl enable mini-haltestelle.service >/dev/null
 systemctl restart mini-haltestelle.service
 
 echo
+if grep -q "<server-ip>" "$CONF_DIR/client.yaml"; then
+  echo "!! Server-Adresse fehlt noch. Entweder erneut:  sudo $0 http://<IP-des-Servers>:8080"
+  echo "!! oder in $CONF_DIR/client.yaml bei server_url eintragen."
+fi
 echo "Fertig. Status:  systemctl status mini-haltestelle"
 echo "Log:            journalctl -u mini-haltestelle -f"
 echo "Config:         sudo nano $CONF_DIR/client.yaml   (danach: sudo systemctl restart mini-haltestelle)"

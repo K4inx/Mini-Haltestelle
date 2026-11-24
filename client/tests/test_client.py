@@ -269,3 +269,10 @@ def test_footer_keeps_arrival_time_with_long_destination():
     out = fit_keep_tail(text, f, 220)
     assert out.endswith("… ca. 07:58") and f.getlength(out) <= 220
     assert fit_keep_tail("Ankunft Höchst ca. 07:58", f, 220) == "Ankunft Höchst ca. 07:58"
+
+
+def test_placeholder_server_url_gives_clear_error():
+    from abfahrt_client.api import ServerApi
+
+    with pytest.raises(ApiError, match="Server-Adresse fehlt"):
+        ServerApi("http://<server-ip>:8080", "pi").board()

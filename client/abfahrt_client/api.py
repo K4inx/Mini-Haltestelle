@@ -23,6 +23,8 @@ class ServerApi:
         self.session.headers["User-Agent"] = f"mini-haltestelle-client/{__version__}"
 
     def _req(self, method: str, path: str, **kw: Any) -> Any:
+        if "<" in self.base or not self.base.startswith(("http://", "https://")):
+            raise ApiError("Server-Adresse fehlt in /etc/abfahrtsanzeige/client.yaml (server_url)")
         try:
             r = self.session.request(method, self.base + path, timeout=self.timeout, **kw)
         except requests.RequestException as e:
