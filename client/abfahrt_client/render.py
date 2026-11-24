@@ -99,6 +99,24 @@ def _rgb(color: str) -> tuple[int, int, int]:
     return ImageColor.getrgb(color)[:3]
 
 
+_LUT = (
+    [v & 0xF8 for v in range(256)],  # R → oberes Byte
+    [v >> 5 for v in range(256)],  # G → oberes Byte
+    [(v & 0x1C) << 3 for v in range(256)],  # G → unteres Byte
+    [v >> 3 for v in range(256)],  # B → unteres Byte
+)
+
+
+def rgb565(img: Image.Image) -> bytes:
+    """RGB565 big-endian, wie der ST7789 es will — nur mit Pillow (C), ohne numpy."""
+    from PIL import ImageChops
+
+    r, g, b = img.convert("RGB").split()
+    hi = ImageChops.add(r.point(_LUT[0]), g.point(_LUT[1]))
+    lo = ImageChops.add(g.point(_LUT[2]), b.point(_LUT[3]))
+    return Image.merge("LA", (hi, lo)).tobytes()
+
+
 class CachedDraw:
     """Wie ``ImageDraw.Draw``, aber ``text`` nutzt den Masken-Zwischenspeicher."""
 
@@ -233,6 +251,35 @@ class Renderer:
     # ------------------------------------------------------------------ #
     # Fußzeile (eigener Bereich, Lauftext per Offset)
     # ------------------------------------------------------------------ #
+
+    def footer_scroll_raw(self, board: Board, now: datetime, view: str, offset: int) -> bytes | None:
+        """Lauftext-Fußzeile direkt als RGB565-Bytes (Bereich ``FOOTER_BOX``).
+
+        Streifen und Grundbild werden einmal umgerechnet; pro Bild werden nur Bytes je Zeile
+        ausgeschnitten und aneinandergehängt. Auf dem Pi Zero ~1 ms statt ~15 ms.
+        ``None``, wenn gerade nichts läuft (dann den normalen Weg nehmen).
+        """
+        if board.stale and board.stale_since:
+            return None
+        text, scrolling = self.footer_text(board, now, view)
+        if not scrolling:
+            return None
+        cy = (H - FOOT_Y) // 2 + 1
+        strip, period = self._strip(text, H - FOOT_Y - 1, cy - 1)
+        src = board.source
+        sw = int(tlen(font(*F_SRC), src)) + 8 if src else 0
+        area_w = W - sw - 8
+        key = (id(strip), src)
+        if getattr(self, "_raw_key", None) != key:
+            base = self._footer_base(src)
+            self._raw_base = [rgb565(base.crop((0, y, W, y + 1))) for y in range(base.height)]
+            self._raw_strip = [rgb565(strip.crop((0, y, strip.width, y + 1))) for y in range(strip.height)]
+            self._raw_key = key
+        x = (offset % period) * 2
+        rows = [self._raw_base[0]]
+        for y, srow in enumerate(self._raw_strip, start=1):
+            rows.append(srow[x : x + area_w * 2] + self._raw_base[y][area_w * 2 :])
+        return b"".join(rows)
 
     def footer_text(self, board: Board, now: datetime, view: str) -> tuple[str, bool]:
         """(Text, läuft?) — Meldungen laufen, sonst Ankunft der nächsten Bahn."""

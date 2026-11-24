@@ -43,6 +43,12 @@ class Display:
     def _push(self, img: Image.Image, box: tuple[int, int, int, int]) -> None:
         raise NotImplementedError
 
+    supports_raw = False
+
+    def push_raw(self, data: bytes, box: tuple[int, int, int, int]) -> None:
+        """Fertige RGB565-Bytes für einen Bereich (nur Hardware). ``box`` unrotiert."""
+        raise NotImplementedError
+
     # Licht ------------------------------------------------------------
     def set_backlight(self, value: float) -> None:
         self.backlight = max(0.0, min(1.0, value))

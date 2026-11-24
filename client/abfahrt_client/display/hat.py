@@ -51,10 +51,12 @@ def to_rgb565(img: Image.Image) -> bytes:
 
     a = np.asarray(img.convert("RGB"), dtype=np.uint16)
     v = ((a[..., 0] & 0xF8) << 8) | ((a[..., 1] & 0xFC) << 3) | (a[..., 2] >> 3)
-    return v.astype(">u2").tobytes()
+    return v.astype(">u2").tobytes()  # gleiches Ergebnis wie render.rgb565, hier schneller für Vollbilder
 
 
 class HatDisplay(Display):
+    supports_raw = True
+
     def __init__(self, rotation: int = 180, spi_hz: int = 60_000_000):
         """``rotation=180`` entspricht der Montage, wie Pimoroni sie vorsieht (Taster links/rechts)."""
         super().__init__()
@@ -62,6 +64,8 @@ class HatDisplay(Display):
         from gpiozero import RGBLED, Button, DigitalOutputDevice, PWMOutputDevice
 
         self.rotation = rotation % 360
+        self._dc_state: bool | None = None
+        self._win: tuple[int, int, int, int] | None = None
         self.spi = spidev.SpiDev()
         self.spi.open(0, 1)
         self.spi.max_speed_hz = spi_hz
@@ -78,11 +82,17 @@ class HatDisplay(Display):
         self._init_panel()
 
     # --- SPI --------------------------------------------------------------
+    def _set_dc(self, data: bool) -> None:
+        # gpiozero-Aufrufe sind auf dem Zero teuer (~0,5 ms) — nur bei echtem Wechsel
+        if self._dc_state is not data:
+            (self.dc.on if data else self.dc.off)()
+            self._dc_state = data
+
     def _cmd(self, c: int, data: list[int] | bytes | None = None) -> None:
-        self.dc.off()
+        self._set_dc(False)
         self.spi.writebytes([c])
         if data:
-            self.dc.on()
+            self._set_dc(True)
             self.spi.writebytes2(bytes(data))
 
     def _init_panel(self) -> None:
@@ -96,7 +106,11 @@ class HatDisplay(Display):
         time.sleep(0.1)
 
     def _window(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """Fenster inklusive x0..x1-1 / y0..y1-1."""
+        """Fenster inklusive x0..x1-1 / y0..y1-1. Gleiches Fenster → nur RAMWR (Schreibzeiger auf Anfang)."""
+        if self._win == (x0, y0, x1, y1):
+            self._cmd(RAMWR)
+            return
+        self._win = (x0, y0, x1, y1)
         self._cmd(CASET, [x0 >> 8, x0 & 0xFF, (x1 - 1) >> 8, (x1 - 1) & 0xFF])
         self._cmd(RASET, [y0 >> 8, y0 & 0xFF, (y1 - 1) >> 8, (y1 - 1) & 0xFF])
         self._cmd(RAMWR)
@@ -107,8 +121,17 @@ class HatDisplay(Display):
             img = img.rotate(180)
             x0, y0, x1, y1 = self.width - x1, self.height - y1, self.width - x0, self.height - y0
         self._window(x0, y0, x1, y1)
-        self.dc.on()
+        self._set_dc(True)
         self.spi.writebytes2(to_rgb565(img))
+
+    def push_raw(self, data: bytes, box: tuple[int, int, int, int]) -> None:
+        x0, y0, x1, y1 = box
+        if self.rotation == 180:  # 180°: Pixelreihenfolge umdrehen, Bytes je Pixel bleiben
+            data = memoryview(data).cast("H")[::-1].tobytes()
+            x0, y0, x1, y1 = self.width - x1, self.height - y1, self.width - x0, self.height - y0
+        self._window(x0, y0, x1, y1)
+        self._set_dc(True)
+        self.spi.writebytes2(data)
 
     # --- Licht -----------------------------------------------------------
     def set_backlight(self, value: float) -> None:

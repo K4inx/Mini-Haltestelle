@@ -310,7 +310,11 @@ class App:
         elif scrolling:
             b = self.effective_board()
             if b is not None:
-                self.display.show_region(self.r.footer(b, now, self.view, offset), FOOTER_BOX)
+                raw = self.r.footer_scroll_raw(b, now, self.view, offset) if self.display.supports_raw else None
+                if raw is not None:
+                    self.display.push_raw(raw, FOOTER_BOX)
+                else:
+                    self.display.show_region(self.r.footer(b, now, self.view, offset), FOOTER_BOX)
         self.lights()
         return TICK_MARQUEE if scrolling or self._pressed else TICK_IDLE
 

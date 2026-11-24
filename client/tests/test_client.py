@@ -276,3 +276,18 @@ def test_placeholder_server_url_gives_clear_error():
 
     with pytest.raises(ApiError, match="Server-Adresse fehlt"):
         ServerApi("http://<server-ip>:8080", "pi").board()
+
+
+@pytest.mark.parametrize("offset", [0, 37, 500])
+def test_raw_footer_matches_rendered_footer(offset):
+    from abfahrt_client.display.hat import to_rgb565
+    from abfahrt_client.render import rgb565
+
+    b = Board.from_json(demo_board_json(NOW))
+    r = Renderer()
+    raw = r.footer_scroll_raw(b, NOW, "list", offset)
+    img = r.footer(b, NOW, "list", offset)
+    assert raw == to_rgb565(img) == rgb565(img)
+    # 180°: umgedrehte Pixelreihenfolge entspricht dem gedrehten Bild
+    assert memoryview(raw).cast("H")[::-1].tobytes() == to_rgb565(img.rotate(180))
+    assert r.footer_scroll_raw(Board.from_json(demo_board_json(NOW, messages=False)), NOW, "list", 0) is None
