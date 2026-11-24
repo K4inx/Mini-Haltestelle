@@ -19,9 +19,9 @@ brauchen kein Update am Gerät.
 | Ordner | Inhalt | Stand |
 |---|---|---|
 | `server/` | FastAPI-Backend, Poller, Web-UI, Docker | Phase 1 ✔ |
-| `client/` | Python-Client für den Pi, Mock-Modus | Phase 2 |
+| `client/` | Python-Client für den Pi, Mock-Fenster für den PC | Phase 2 ✔ (Mock), Hardware-Test offen |
 | `case/` | parametrisches OpenSCAD-Gehäuse | Phase 3 |
-| `docs/` | [API-Vertrag](docs/api-contract.md), Setup-Anleitungen | |
+| `docs/` | [API-Vertrag](docs/api-contract.md), [Pi einrichten](docs/pi-setup.md), [Mock unter Windows](docs/mock-windows.md) | |
 
 ## Funktionen (Server)
 
@@ -68,9 +68,33 @@ CONFIG_PATH=config/config.yaml ../.venv/bin/uvicorn app.main:app --reload --port
 ../.venv/bin/ruff check . && ../.venv/bin/ruff format --check .
 ```
 
-### Client (Mock)
+### Client
 
-Kommt mit Phase 2.
+Auf dem Pi (Raspberry Pi OS Lite 32-bit, Legacy/Bookworm). Alles kommt aus apt, nichts muss kompiliert werden:
+
+```bash
+sudo git clone https://github.com/K4inx/Mini-Haltestelle.git /opt/mini-haltestelle
+sudo /opt/mini-haltestelle/client/install.sh
+```
+
+Komplette Anleitung inklusive Löten und SD-Karte: [docs/pi-setup.md](docs/pi-setup.md).
+
+Ohne Hardware, im Fenster auf dem PC (Tasten A/B/X/Y, halten = langer Druck):
+
+```bash
+cd client
+python -m venv .venv && .venv/bin/pip install -r requirements-pc.txt
+.venv/bin/python -m abfahrt_client --mock --server http://<server-ip>:8080   # oder --demo
+.venv/bin/python -m abfahrt_client --png out --demo                         # nur Bilddatei
+```
+
+Windows: [docs/mock-windows.md](docs/mock-windows.md).
+
+**Client-Aufbau:** Der Client hat einen eigenen schlanken ST7789-Treiber (`spidev` +
+`gpiozero`) statt Pimorons `displayhatmini`-Bibliothek. Die ist seit 2022 eingefroren, nutzt
+`RPi.GPIO` und zieht per pip Abhängigkeiten nach, die auf ARMv6 kompiliert werden müssten.
+Das Vollbild wird nur bei neuen Daten, Tastendruck oder Minutenwechsel neu gezeichnet. Der
+Lauftext aktualisiert nur die Fußzeile per Teilfenster.
 
 ## Konfiguration
 

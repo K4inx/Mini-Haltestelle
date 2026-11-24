@@ -1,0 +1,17 @@
+# Mini-Haltestelle — Client-Konfiguration
+# Auf dem Pi: /etc/abfahrtsanzeige/client.yaml (legt install.sh an)
+
+# Server im Heimnetz. Die IP statt eines .homelab-Namens nehmen: Der Pi fragt den
+# Router als DNS, der kennt interne Namen nicht.
+server_url: "http://<server-ip>:8080"
+
+# Name des Geräts beim Server (eigene Vorlagen-Auswahl, Erinnerung, Nachtmodus)
+device_id: pi
+
+poll_seconds: 30          # wie oft neue Daten geholt werden; Countdown läuft lokal
+theme: dark               # dark (DFI-Stil) | light
+rotation: 0               # 180, falls das Gehäuse das Display kopfüber hält
+long_press_seconds: 3     # „halten" bei X und Y
+wake_seconds: 30          # nachts: Display nach Tastendruck so lange hell
+offline_error_minutes: 10 # danach Fehler-Screen statt alter Daten
+led_brightness: 0.3       # 0…1, die LED ist sehr hell

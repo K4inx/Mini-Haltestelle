@@ -1,0 +1,36 @@
+[project]
+name = "mini-haltestelle-client"
+version = "0.1.0"
+requires-python = ">=3.11"
+# Auf dem Pi kommen diese aus apt (python3-pil, python3-requests, python3-yaml,
+# python3-numpy, python3-spidev, python3-gpiozero) — siehe install.sh.
+dependencies = ["pillow", "requests", "pyyaml"]
+
+[project.optional-dependencies]
+pc = ["pygame>=2.6"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+mini-haltestelle = "abfahrt_client.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["abfahrt_client*"]
+
+[tool.setuptools.package-data]
+abfahrt_client = ["fonts/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]

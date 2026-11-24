@@ -1,0 +1,20 @@
+[Unit]
+Description=Mini-Haltestelle Abfahrtsanzeige (Display HAT Mini)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+SupplementaryGroups=spi gpio
+WorkingDirectory=@CLIENT_DIR@
+ExecStart=@VENV@/bin/python -m abfahrt_client
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+# Wenig RAM auf dem Zero: klar begrenzen, statt das System auszubremsen
+MemoryMax=150M
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

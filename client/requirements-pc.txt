@@ -1,0 +1,5 @@
+# Für den Mock-Modus auf dem PC:  pip install -r requirements-pc.txt
+pillow
+requests
+pyyaml
+pygame>=2.6
